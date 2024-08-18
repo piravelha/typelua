@@ -20,7 +20,8 @@ else_stmt: "else" chunk
 return_stmt: "return" exprs
 
 func_assign: "function" NAME "(" [params] ")" chunk "end"
-func_decl: "local" "function" NAME "(" [params] ")"  chunk "end"
+func_decl: "local" "function" NAME "(" [params] ")" chunk "end"
+func_expr: "function" "(" [params] ")" chunk "end"
 params: names ["," ELLIPSIS] | ELLIPSIS
 
 var_assign: names "=" exprs
@@ -41,6 +42,7 @@ table_field: expr
            | "[" expr "]" "=" expr -> dict_field
 
 ?expr: log_expr
+     | func_expr
      | ELLIPSIS
 
 ?log_expr: log_expr LOG_OP eq_expr

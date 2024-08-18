@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TypeAlias, Union, Optional
+from typing import TypeAlias, Union, Optional, TypeGuard, Any
 
 @dataclass
 class Location:
@@ -18,14 +18,17 @@ Expr: TypeAlias = Union[
   'Boolean',
   'String',
   'Table',
+  'Vararg',
   'UnaryExpr',
   'BinaryExpr',
   'FuncCall',
-  'PropExpr',
   'IndexExpr',
   'FuncExpr',
 ]
 
+def is_expr(value: Any) -> TypeGuard[Expr]:
+  return isinstance(value, BaseNode)
+  
 Stmt: TypeAlias = Union[
   'VarDecl',
   'VarAssign',
@@ -53,6 +56,9 @@ class String(BaseNode):
 class Nil(BaseNode): pass
 
 @dataclass
+class Vararg(BaseNode): pass
+
+@dataclass
 class UnaryExpr(BaseNode):
   op: str
   value: Expr
@@ -65,17 +71,12 @@ class BinaryExpr(BaseNode):
 
 @dataclass
 class Table(BaseNode):
-  fields: dict[Expr, Expr]
+  fields: list[tuple[Expr, Expr]]
 
 @dataclass
 class FuncCall(BaseNode):
   func: Expr
   args: list[Expr]
-
-@dataclass
-class PropExpr(BaseNode):
-  obj: Expr
-  prop: str
 
 @dataclass
 class IndexExpr(BaseNode):
@@ -95,6 +96,7 @@ class VarAssign(BaseNode):
 @dataclass
 class FuncExpr(BaseNode):
   params: list[str]
+  is_vararg: bool
   body: 'Chunk'
 
 @dataclass
@@ -116,5 +118,5 @@ class IfStmt(BaseNode):
 @dataclass
 class Chunk(BaseNode):
   stmts: list[Stmt]
-  last: ReturnStmt
+  last: Optional[ReturnStmt]
 
