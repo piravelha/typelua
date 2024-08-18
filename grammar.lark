@@ -1,0 +1,96 @@
+
+?start: chunk
+
+chunk: stmt* [last_stmt]
+
+?stmt: var_decl
+     | func_decl
+     | var_assign
+     | func_assign
+     | if_stmt
+     | func_call
+
+if_stmt: "if" expr "then" chunk elseif_stmts [else_stmt] "end"
+elseif_stmts: elseif_stmt*
+elseif_stmt: "elseif" expr "then" chunk
+else_stmt: "else" chunk
+
+?last_stmt: return_stmt
+
+return_stmt: "return" exprs
+
+func_assign: "function" NAME "(" [params] ")" chunk "end"
+func_decl: "local" "function" NAME "(" [params] ")"  chunk "end"
+params: names ["," ELLIPSIS] | ELLIPSIS
+
+var_assign: names "=" exprs
+var_decl: "local" names "=" exprs
+
+exprs: expr ("," expr)*
+names: NAME ("," NAME)*
+
+prop_expr: primary_expr "." NAME
+index_expr: primary_expr "[" expr "]"
+
+func_call: primary_expr args
+args: "(" (expr ("," expr)*)? ")"
+
+table: "{" (table_field ("," table_field)* ","?)? "}"
+table_field: expr
+           | NAME "=" expr -> obj_field
+           | "[" expr "]" "=" expr -> dict_field
+
+?expr: log_expr
+     | ELLIPSIS
+
+?log_expr: log_expr LOG_OP eq_expr
+         | eq_expr
+
+?eq_expr: eq_expr EQ_OP rel_expr
+        | rel_expr
+
+?rel_expr: rel_expr REL_OP add_expr
+         | add_expr
+
+?add_expr: add_expr ADD_OP mul_expr
+         | mul_expr
+
+?mul_expr: mul_expr MUL_OP pow_expr
+         | pow_expr
+
+?pow_expr: pow_expr POW_OP unary_expr
+         | unary_expr
+
+?unary_expr: UNARY_OP unary_expr
+           | atom
+
+?atom: NUMBER
+     | STRING
+     | BOOLEAN
+     | NIL
+     | table
+     | primary_expr
+
+?primary_expr: NAME -> var
+             | prop_expr
+             | index_expr
+             | func_call
+             | "(" expr ")"
+
+ELLIPSIS: "..."
+LOG_OP: "and" | "or"
+EQ_OP: "==" | "~="
+REL_OP: "<" | ">" | "<=" | ">="
+ADD_OP: "+" | "-"
+MUL_OP: "*" | "/"
+POW_OP: "^"
+UNARY_OP: "-" | "#" | "not"
+
+NIL: /nil/
+BOOLEAN: /true|false/
+STRING: /"([^"\\]|\\.)*"/
+NUMBER: /-?\d+(\.\d+)?/
+NAME: /[a-zA-Z_]\w*/
+
+%ignore /\s+/
+%ignore /--.*$/
