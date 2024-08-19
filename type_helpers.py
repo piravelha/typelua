@@ -50,6 +50,10 @@ def new_type_var() -> TypeVariable:
   return TypeVariable(f"t{var_count}")
 
 def intersect(type1: MonoType, type2: MonoType) -> MonoType:
+  if isinstance(type1, TypeVariable):
+    return type2
+  if isinstance(type2, TypeVariable):
+    return type1
   if isinstance(type1, TableType) and isinstance(type2, TableType):
     fields = type1.fields + type2.fields
     return TableType(fields)
@@ -156,4 +160,9 @@ def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
 def broaden(type: MonoType) -> MonoType:
   if isinstance(type, TypeConstructor):
     return TypeConstructor(type.name, [broaden(a) for a in type.args], None)
+  return type
+
+def flatten_tuple(type: MonoType) -> MonoType:
+  if isinstance(type, TypeConstructor) and type.name == "tuple":
+    return flatten_tuple(type.args[0])
   return type

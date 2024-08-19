@@ -119,6 +119,7 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
     res = infer(node.value, ctx)
     if isinstance(res, UnifyError): return res
     value_s, value_t = res
+    value_t = flatten_tuple(value_t)
     if node.op == "-":
       num_s = unify(value_t, NumberType)
       if isinstance(num_s, str): return UnifyError(node.location, num_s)
@@ -136,9 +137,11 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
     res = infer(node.left, ctx)
     if isinstance(res, UnifyError): return res
     left_s, left_t = res
+    left_t = flatten_tuple(left_t)
     res = infer(node.right, ctx)
     if isinstance(res, UnifyError): return res
     right_s, right_t = res
+    right_t = flatten_tuple(right_t)
     if node.op in ["+", "-", "*", "/", "%", "^"]:
       num_left_s = unify(left_t, NumberType)
       if isinstance(num_left_s, str): return UnifyError(node.location, num_left_s)
@@ -337,9 +340,9 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
       if isinstance(stmt_t, TypeConstructor) and stmt_t.name == "tuple" and not isinstance(stmt, FuncCall):
         if ret is None:
           ret = stmt_t
-        ret_s = unify(stmt_t, ret)
+        ret_s = unify(stmt_t, broaden(ret))
         if isinstance(ret_s, str): return UnifyError(node.location, ret_s)
-        ret = ret_s.apply_mono(ret)
+        ret = ret_s.apply_mono(broaden(ret))
         s = ret_s.apply_subst(s)
       s = stmt_s.apply_subst(s)
     if node.last:
@@ -348,9 +351,9 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
       stmt_s, stmt_t = res
       if not ret:
         ret = stmt_t
-      ret_s = unify(stmt_t, ret)
+      ret_s = unify(stmt_t, broaden(ret))
       if isinstance(ret_s, str): return UnifyError(node.location, ret_s)
-      ret = ret_s.apply_mono(ret)
+      ret = ret_s.apply_mono(broaden(ret))
       s = ret_s.apply_subst(s)
       s = stmt_s.apply_subst(s)
     elif ret:

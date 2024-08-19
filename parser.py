@@ -100,7 +100,6 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
       is_vararg = params.children[0] is not None
     if not loc:
       loc = Location(file_path, 0, 0)
-    print(annotation)
     return VarAssign(get_loc(name), [Var(get_loc(name), name.value)], [FuncExpr(loc, param_strs, is_vararg, body, name.value, annotation)])
   def func_decl(self, args: tuple[Token, Tree[Any] | None, FuncAnnotation, Chunk]) -> BaseNode:
   

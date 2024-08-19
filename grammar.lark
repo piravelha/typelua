@@ -89,7 +89,7 @@ table_field: expr
              | func_call
              | "(" expr ")"
 
-PRIMITIVE_TYPE: "number"
+PRIMITIVE_TYPE: "number" | "string" | "boolean" | "nil"
 
 ELLIPSIS: "..."
 LOG_OP: "and" | "or"
