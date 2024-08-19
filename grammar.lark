@@ -20,7 +20,7 @@ else_stmt: "else" chunk
 
 ?last_stmt: return_stmt
 
-return_stmt: "return" exprs
+return_stmt: "return" [exprs]
 
 func_assign: "function" NAME "(" [params] ")" func_annotations chunk "end"
 func_decl: "local" "function" NAME "(" [params] ")" func_annotations chunk "end"

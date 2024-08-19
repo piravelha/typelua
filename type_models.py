@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TypeAlias, Any, cast
+from typing import Literal, TypeAlias, Any, cast
 
 MonoType: TypeAlias = """
   TypeVariable
@@ -39,6 +39,8 @@ class TypeConstructor:
       rets = ", ".join(str(r) for r in self.args[1].args) if isinstance(self.args[1], TypeConstructor) else repr(self.args[1])
       return f"({params}) -> {rets}"
     if self.name == "tuple":
+      if len(self.args) == 1:
+        return str(self.args[0])
       return "(" + ", ".join(str(a) for a in self.args) + ")"
     if self.args:
       args = ", ".join(str(a) for a in self.args)
@@ -50,10 +52,34 @@ StringType = TypeConstructor("string", [], None)
 BooleanType = TypeConstructor("boolean", [], None)
 NilType = TypeConstructor("nil", [], None)
 
+def array_repr(table: 'TableType') -> str | Literal[False]:
+  from type_helpers import unify, broaden
+  types = list(map(lambda f: f[1], table.fields))
+  filtered = []
+  for type in types:
+    for filt in filtered:
+      if not isinstance(unify(type, filt), str):
+        break
+    else:
+      filtered.append(broaden(type))
+  filtered = [repr(f) for f in filtered]
+  if len(filtered) > 1:
+    return False
+  return f"{filtered[0]}[]"
+
+def is_array(table: 'TableType') -> bool:
+  for k, v in table.fields:
+    if not isinstance(k, TypeConstructor) or k.name != "number":
+      return False
+  return True
+
 @dataclass
 class TableType:
   fields: list[tuple[MonoType, MonoType]]
   def __repr__(self) -> str:
+    if is_array(self):
+      if (r := array_repr(self)) is not False:
+        return r
     s = "{"
     for i, (k, v) in enumerate(self.fields):
       if i > 0:

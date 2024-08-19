@@ -73,6 +73,7 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
     exprs = args[0]
     expr_exprs: list[Expr] = []
     loc: Location | None = None
+    exprs = exprs or Tree("exprs", [])
     for expr in exprs.children:
       assert is_expr(expr)
       expr_exprs.append(expr)

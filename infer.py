@@ -20,7 +20,7 @@ def set_path(prefix: Expr, value: MonoType, ctx: Context) -> UnifyError | None:
       if isinstance(res, ForallType):
         res_t = res.body
       else: assert False
-      assert not isinstance(res, ForallType)
+      assert not isinstance(res_t, ForallType)
       return res_t, []
     elif isinstance(expr, IndexExpr):
       base, path = get_base(expr.obj)
@@ -98,7 +98,7 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
       v_subst, v_type = v_res
       s = k_subst.apply_subst(s)
       s = v_subst.apply_subst(s)
-      types.append((k_type, broaden(v_type)))
+      types.append((k_type, v_type))
     return s, TableType(types)
   elif isinstance(node, IndexExpr):
     res = infer(node.obj, ctx)
@@ -296,7 +296,7 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
     exprs = []
     s = Substitution({})
     for expr in node.exprs:
-      res = infer(expr, Context(ctx.mapping.copy()))
+      res = infer(expr, ctx)
       if isinstance(res, UnifyError): return res
       expr_s, expr_t = res
       # TODO: find a better way to do this
@@ -313,6 +313,7 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
         else:
           exprs.append(expr_t)
       s = expr_s.apply_subst_unsafe(s)
+    s.is_returning = True
     return s, TypeConstructor("tuple", exprs, None)
   elif isinstance(node, IfStmt):
     res = infer(node.cond, ctx)
@@ -340,13 +341,19 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
       res = infer(stmt, ctx)
       if isinstance(res, UnifyError): return res
       stmt_s, stmt_t = res
-      if isinstance(stmt_t, TypeConstructor) and stmt_t.name == "tuple" and not isinstance(stmt, FuncCall):
+      if isinstance(stmt_t, TypeConstructor) and stmt_t.name == "tuple" and not isinstance(stmt, FuncCall) and stmt_s.is_returning:
         if ret is None:
           ret = stmt_t
-        ret_s = unify(stmt_t, broaden(ret))
-        if isinstance(ret_s, str): return UnifyError(node.location, ret_s)
-        ret = ret_s.apply_mono(broaden(ret))
-        s = ret_s.apply_subst(s)
+        else:
+          #ret_s = unify(stmt_t, broaden(ret))
+          #if isinstance(ret_s, str): return UnifyError(node.location, ret_s)
+          #ret = ret_s.apply_mono(broaden(ret))
+          #s = ret_s.apply_subst(s)
+          for i, arg in enumerate(stmt_t.args):
+            if i >= len(ret.args):
+              ret.args.append(UnionType(arg, NilType))
+            else:
+              ret.args[i] = UnionType(ret.args[i], arg)
       s = stmt_s.apply_subst(s)
     if node.last:
       res = infer(node.last, ctx)
@@ -354,16 +361,25 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
       stmt_s, stmt_t = res
       if not ret:
         ret = stmt_t
-      ret_s = unify(stmt_t, broaden(ret))
-      if isinstance(ret_s, str): return UnifyError(node.location, ret_s)
-      ret = ret_s.apply_mono(broaden(ret))
-      s = ret_s.apply_subst(s)
-      s = stmt_s.apply_subst(s)
+      else:
+        #ret_s = unify(stmt_t, broaden(ret))
+        #if isinstance(ret_s, str): return UnifyError(node.location, ret_s)
+        #ret = ret_s.apply_mono(broaden(stmt_t))
+        assert isinstance(stmt_t, TypeConstructor) and stmt_t.name == "tuple"
+        for i, arg in enumerate(stmt_t.args):
+          if i >= len(ret.args):
+            ret.args.append(UnionType(arg, NilType))
+          else:
+            ret.args[i] = UnionType(ret.args[i], arg)
+        #s = ret_s.apply_subst(s)
+        s = stmt_s.apply_subst(s)
     elif ret:
       ret_s = unify(TypeConstructor("tuple", [], None), ret)
       if isinstance(ret_s, str): return UnifyError(node.location, ret_s)
       ret = ret_s.apply_mono(ret)
+    s.is_returning = True
     if ret is None:
+      s.is_returning = False
       ret = TypeConstructor("tuple", [], None)
     return s, ret
   assert False, f"Not implemented: {node}"

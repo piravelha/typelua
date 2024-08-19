@@ -8,6 +8,10 @@ Result: TypeAlias = str | T
 @dataclass
 class Substitution:
   mapping: dict[str, MonoType]
+  def __init__(self, mapping: dict[str, MonoType], is_returning: bool = False) -> None:
+    self.mapping = mapping
+    self.is_returning = is_returning
+  is_returning: bool
   def apply_mono(self, m: MonoType) -> MonoType:
     if isinstance(m, TypeVariable):
       if m.name in self.mapping:
@@ -36,12 +40,12 @@ class Substitution:
         new[n] = intersect(t, new[n])
       else:
         new[n] = self.apply_mono(t)
-    return Substitution(new)
+    return Substitution(new, self.is_returning or s.is_returning)
   def apply_subst_unsafe(self, s: 'Substitution') -> 'Substitution':
     new = self.mapping.copy()
     for n, t in s.mapping.items():
       new[n] = self.apply_mono(t)
-    return Substitution(new)
+    return Substitution(new, self.is_returning or s.is_returning)
 
 var_count = 0
 def new_type_var() -> TypeVariable:
@@ -156,6 +160,13 @@ def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
     return f"Types dont unify: '{type1}' and '{type2}'"
   if type1.name != type2.name:
     return f"Types dont unify: Expected '{type2.name}', got '{type1.name}'"
+  if type1.name == "tuple" and type2.name == "tuple":
+    s = Substitution({})
+    for a, b in zip(type1.args, type2.args):
+      res = unify(a, b)
+      if isinstance(res, str): return res
+      s = res.apply_subst(res)
+    return s
   if len(type1.args) != len(type2.args):
     return f"Types dont unify: Expected '{type1}', but got '{type2}'" 
   if type1.value is not None and type2.value is not None:
