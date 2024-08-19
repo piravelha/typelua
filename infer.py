@@ -45,7 +45,9 @@ def set_path(prefix: Expr, value: MonoType, ctx: Context) -> UnifyError | None:
     for tup in cur_path.fields:
       k, v = tup
       if not isinstance(unify(paths[-1], k), str):
-        new.append((k, value))
+        subs = unify(value, v)
+        if isinstance(subs, str): return UnifyError(prefix.location, subs)
+        new.append((k, subs.apply_mono(value)))
         found = True
         continue
       new.append((k, v))
