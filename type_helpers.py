@@ -12,6 +12,8 @@ class Substitution:
       return m
     elif isinstance(m, TypeConstructor):
       return TypeConstructor(m.name, [self.apply_mono(a) for a in m.args], m.value)
+    elif isinstance(m, TableType):
+      return TableType([(a, self.apply_mono(b)) for a, b in m.fields])
     assert False, f"Unknown type: {m}"
   def apply_poly(self, p: PolyType) -> PolyType:
     if isinstance(p, (TypeVariable, TypeConstructor)):
@@ -25,7 +27,10 @@ class Substitution:
   def apply_subst(self, s: 'Substitution') -> 'Substitution':
     new = self.mapping.copy()
     for n, t in s.mapping.items():
-      new[n] = self.apply_mono(t)
+      if new.get(n):
+        new[n] = intersect(t, new[n])
+      else:
+        new[n] = self.apply_mono(t)
     return Substitution(new)
 
 var_count = 0
@@ -33,6 +38,12 @@ def new_type_var() -> TypeVariable:
   global var_count
   var_count += 1
   return TypeVariable(f"t{var_count}")
+
+def intersect(type1: MonoType, type2: MonoType) -> MonoType:
+  if isinstance(type1, TableType) and isinstance(type2, TableType):
+    fields = type1.fields + type2.fields
+    return TableType(fields)
+  return type1
 
 def instantiate(type: PolyType, mappings: dict[str, TypeVariable] = {}) -> MonoType:
   if isinstance(type, TypeVariable):
@@ -77,14 +88,14 @@ def unify(type1: MonoType, type2: MonoType) -> Optional[Substitution]:
     return Substitution({type1.name: type2})
   if isinstance(type1, TableType) and isinstance(type2, TableType):
     s = Substitution({})
-    for (k1, v1) in type2.fields:
+    for (k1, v1) in type1.fields:
       v: 'MonoType | None' = None
-      for k2, v2 in type1.fields:
+      for k2, v2 in type2.fields:
         if unify(k1, k2) is not None:
           v = v2
           break
       if v is None: return v
-      v_res = unify(v1, v)
+      v_res = unify(v, v1)
       if not v_res: return v_res
       s = v_res.apply_subst(s)
     return s
@@ -97,9 +108,27 @@ def unify(type1: MonoType, type2: MonoType) -> Optional[Substitution]:
   if type1.value is not None and type2.value is not None:
     if type1.value != type2.value:
       return None
+  if type1.name == "function":
+    s = Substitution({})
+    assert isinstance(type1.args[0], TypeConstructor)
+    assert isinstance(type2.args[0], TypeConstructor)
+    for p1, p2 in zip(type1.args[0].args, type2.args[0].args):
+      res = unify(p2, p1)
+      if res is None: return res
+      s = res.apply_subst(s)
+    res = unify(type1.args[1], type2.args[1])
+    if res is None: return res
+    return res.apply_subst(s)
+  if type2.value is not None and type1.value is None:
+    return None
   s = Substitution({})
   for a, b in zip(type1.args, type2.args):
     res = unify(a, b)
     if not res: return res
     s = res.apply_subst(res)
   return s
+
+def broaden(type: MonoType) -> MonoType:
+  if isinstance(type, TypeConstructor):
+    return TypeConstructor(type.name, type.args, None)
+  return type

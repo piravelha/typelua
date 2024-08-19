@@ -211,13 +211,4 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
   def NUMBER(self, token: Token) -> BaseNode:
     return Number(get_loc(token), float(token.value))
 
-input = """
-  local x = 5
-  local function f(y, ...)
-    return {y, ...}
-  end
-  return f(x, {1, 2, 3})
-"""
 
-tree: Tree[Any] = parser.parse(input)
-print(ToAST().transform(tree))

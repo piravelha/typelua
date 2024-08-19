@@ -83,8 +83,8 @@ ELLIPSIS: "..."
 LOG_OP: "and" | "or"
 EQ_OP: "==" | "~="
 REL_OP: "<" | ">" | "<=" | ">="
-ADD_OP: "+" | "-"
-MUL_OP: "*" | "/"
+ADD_OP: "+" | "-" | ".."
+MUL_OP: "*" | "/" | "%"
 POW_OP: "^"
 UNARY_OP: "-" | "#" | "not"
 
@@ -92,7 +92,7 @@ NIL: /nil/
 BOOLEAN: /true|false/
 STRING: /"([^"\\]|\\.)*"/
 NUMBER: /-?\d+(\.\d+)?/
-NAME: /[a-zA-Z_]\w*/
+NAME: /(?!return)[a-zA-Z_]\w*/
 
 %ignore /\s+/
 %ignore /--.*$/
