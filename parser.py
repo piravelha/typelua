@@ -211,6 +211,8 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
     return UnaryExpr(get_loc(op), op.value, expr)
   def var(self, args: tuple[Token]) -> BaseNode:
     return Var(get_loc(args[0]), args[0].value)
+  def union_type(self, args: tuple[MonoType, MonoType]) -> MonoType:
+    return UnionType(args[0], args[1])
   def tuple_type(self, args: list[MonoType]) -> MonoType:
     return TypeConstructor("tuple", args, None)
   def PRIMITIVE_TYPE(self, token: Token) -> MonoType:

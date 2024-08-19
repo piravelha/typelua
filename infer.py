@@ -344,18 +344,18 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
       if isinstance(stmt_t, TypeConstructor) and stmt_t.name == "tuple" and not isinstance(stmt, FuncCall) and stmt_s.is_returning:
         if ret is None:
           ret = stmt_t
-        else:
-          ret_s = unify(stmt_t, broaden(ret))
-          if isinstance(ret_s, str):
-            ret_s = Substitution({})
-            # return UnifyError(node.location, ret_s)
-          s = ret_s.apply_subst(s)
-          for i, arg in enumerate(stmt_t.args):
-            if i >= len(ret.args):
-              ret.args.append(UnionType(arg, NilType))
-            else:
-              ret.args[i] = UnionType(ret.args[i], arg)
-          ret = ret_s.apply_mono(broaden(ret))
+        #else:
+        ret_s = unify(stmt_t, broaden(ret))
+        if isinstance(ret_s, str):
+          ret_s = Substitution({})
+          # return UnifyError(node.location, ret_s)
+        s = ret_s.apply_subst(s)
+        for i, arg in enumerate(stmt_t.args):
+          if i >= len(ret.args):
+            ret.args.append(UnionType(arg, NilType))
+          else:
+            ret.args[i] = UnionType(ret.args[i], arg)
+        ret = ret_s.apply_mono(broaden(ret))
       s = stmt_s.apply_subst(s)
     if node.last:
       res = infer(node.last, ctx)
@@ -368,7 +368,7 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
         if isinstance(ret_s, str):
           ret_s = Substitution({})
           # return UnifyError(node.location, ret_s)
-        ret = ret_s.apply_mono(broaden(stmt_t))
+        ret = ret_s.apply_mono(broaden(ret))
         assert isinstance(stmt_t, TypeConstructor) and stmt_t.name == "tuple"
         for i, arg in enumerate(stmt_t.args):
           if i >= len(ret.args):

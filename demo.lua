@@ -1,8 +1,8 @@
 
 function factorial(x)
-  --@return number
+  --@return number | boolean
   if x .. "!" == "a!" then
-    return 1
+    return false
   end
   return #x + factorial(x)
 end

@@ -2,6 +2,7 @@
 ?start: chunk
 
 ?type: PRIMITIVE_TYPE
+     | type "|" type -> union_type
 tuple_type: type ("," type)*
 
 chunk: stmt* [last_stmt]
