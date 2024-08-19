@@ -6,6 +6,8 @@ class Location:
   file: str
   line: int
   column: int
+  def __repr__(self) -> str:
+    return f"{self.file}:{self.line}:{self.column}"
 
 @dataclass
 class BaseNode:

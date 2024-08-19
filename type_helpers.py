@@ -1,6 +1,9 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, TypeVar, TypeAlias
 from type_models import *
+
+T = TypeVar("T")
+Result: TypeAlias = str | T
 
 @dataclass
 class Substitution:
@@ -8,7 +11,7 @@ class Substitution:
   def apply_mono(self, m: MonoType) -> MonoType:
     if isinstance(m, TypeVariable):
       if m.name in self.mapping:
-        return self.mapping[m.name]
+        return self.apply_mono(self.mapping[m.name])
       return m
     elif isinstance(m, TypeConstructor):
       return TypeConstructor(m.name, [self.apply_mono(a) for a in m.args], m.value)
@@ -32,6 +35,13 @@ class Substitution:
       else:
         new[n] = self.apply_mono(t)
     return Substitution(new)
+  def apply_subst_unsafe(self, s: 'Substitution') -> 'Substitution':
+    new = self.mapping.copy()
+    for n, t in s.mapping.items():
+      new[n] = self.apply_mono(t)
+    return Substitution(new)
+
+
 
 var_count = 0
 def new_type_var() -> TypeVariable:
@@ -43,7 +53,21 @@ def intersect(type1: MonoType, type2: MonoType) -> MonoType:
   if isinstance(type1, TableType) and isinstance(type2, TableType):
     fields = type1.fields + type2.fields
     return TableType(fields)
-  return type1
+  if isinstance(type1, TypeVariable) and isinstance(type2, TypeVariable):
+    if type1.name != type2.name:
+      print(f"(DEBUG 0) Never type detected")
+      #exit(1)
+    return type1
+  if isinstance(type1, TypeConstructor) and isinstance(type2, TypeConstructor):
+    if type1.name != type2.name:
+      print(f"(DEBUG 1) Never type detected")
+      #exit(1)
+    args = []
+    for a, b in zip(type1.args, type2.args):
+      args.append(intersect(a, b))
+    return TypeConstructor(type1.name, args, type1.value)
+  print(f"(DEBUG 2) Never type detected")
+  #exit(1)
 
 def instantiate(type: PolyType, mappings: dict[str, TypeVariable] = {}) -> MonoType:
   if isinstance(type, TypeVariable):
@@ -79,7 +103,7 @@ def generalize(type: MonoType, ctx: Context) -> PolyType:
     poly = ForallType(v, poly)
   return poly
 
-def unify(type1: MonoType, type2: MonoType) -> Optional[Substitution]:
+def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
   if isinstance(type1, TypeVariable) and isinstance(type2, TypeVariable) and type1.name == type2.name:
     return Substitution({})
   if isinstance(type2, TypeVariable):
@@ -94,37 +118,37 @@ def unify(type1: MonoType, type2: MonoType) -> Optional[Substitution]:
         if unify(k1, k2) is not None:
           v = v2
           break
-      if v is None: return v
+      if v is None: return f"Field '{k1}' expected on type '{type2}', but was not found"
       v_res = unify(v, v1)
-      if not v_res: return v_res
+      if isinstance(v_res, str): return v_res
       s = v_res.apply_subst(s)
     return s
   if not isinstance(type1, TypeConstructor) or not isinstance(type2, TypeConstructor):
-    return None
+    return f"Types dont unify: '{type1}' and '{type2}'"
   if type1.name != type2.name:
-    return None
+    return f"Names of types dont match: Expected '{type2.name}', got '{type1.name}'"
   if len(type1.args) != len(type2.args):
-    return None
+    return f"Generic types have a different count of generic arguments: '{type1}' and '{type2}'" 
   if type1.value is not None and type2.value is not None:
     if type1.value != type2.value:
-      return None
+      return f"Type '{type1}' does not extend type '{type2}'" 
   if type1.name == "function":
     s = Substitution({})
     assert isinstance(type1.args[0], TypeConstructor)
     assert isinstance(type2.args[0], TypeConstructor)
     for p1, p2 in zip(type1.args[0].args, type2.args[0].args):
       res = unify(p2, p1)
-      if res is None: return res
+      if isinstance(res, str): return res
       s = res.apply_subst(s)
     res = unify(type1.args[1], type2.args[1])
-    if res is None: return res
+    if isinstance(res, str): return res
     return res.apply_subst(s)
   if type2.value is not None and type1.value is None:
-    return None
+    return f"Type '{type1}' does not extend type '{type2}'"
   s = Substitution({})
   for a, b in zip(type1.args, type2.args):
     res = unify(a, b)
-    if not res: return res
+    if isinstance(res, str): return res
     s = res.apply_subst(res)
   return s
 

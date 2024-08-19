@@ -95,4 +95,4 @@ NUMBER: /-?\d+(\.\d+)?/
 NAME: /(?!return)[a-zA-Z_]\w*/
 
 %ignore /\s+/
-%ignore /--.*$/
+%ignore /--.*/

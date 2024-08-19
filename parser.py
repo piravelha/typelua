@@ -2,9 +2,11 @@ from lark import Lark, Transformer, Token, Tree
 from typing import Any
 from models import *
 
+import sys
+
 parser = Lark.open("grammar.lark")
 
-file_path = "???"
+file_path = sys.argv[1]
 
 def get_loc(node: Token | Tree[Any]) -> Location:
   global file_path
