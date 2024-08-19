@@ -37,7 +37,9 @@ class Substitution:
     new = self.mapping.copy()
     for n, t in s.mapping.items():
       if new.get(n):
-        new[n] = intersect(t, new[n])
+        res = intersect(t, new[n])
+        if res is None: assert False
+        new[n] = res
       else:
         new[n] = self.apply_mono(t)
     return Substitution(new, self.is_returning or s.is_returning)
@@ -53,7 +55,7 @@ def new_type_var() -> TypeVariable:
   var_count += 1
   return TypeVariable(f"t{var_count}")
 
-def intersect(type1: MonoType, type2: MonoType) -> MonoType:
+def intersect(type1: MonoType, type2: MonoType) -> 'Optional[MonoType]':
   if isinstance(type1, TypeVariable):
     return type2
   if isinstance(type2, TypeVariable):
@@ -69,20 +71,16 @@ def intersect(type1: MonoType, type2: MonoType) -> MonoType:
     return TableType(fields)
   if isinstance(type1, TypeVariable) and isinstance(type2, TypeVariable):
     if type1.name != type2.name:
-      print(f"(DEBUG 0) Never type detected")
-      #exit(1)
+      return None
     return type1
   if isinstance(type1, TypeConstructor) and isinstance(type2, TypeConstructor):
     if type1.name != type2.name:
-      print(f"(DEBUG 1) Never type detected")
-      #exit(1)
+      return None
     args = []
     for a, b in zip(type1.args, type2.args):
       args.append(intersect(a, b))
     return TypeConstructor(type1.name, args, type1.value)
-  print(f"(DEBUG 2) Never type detected")
-  #exit(1)
-  assert False
+  return None
 
 def instantiate(type: PolyType, mappings: dict[str, TypeVariable] = {}) -> MonoType:
   if isinstance(type, TypeVariable):
@@ -98,8 +96,6 @@ def instantiate(type: PolyType, mappings: dict[str, TypeVariable] = {}) -> MonoT
   elif isinstance(type, ForallType):
     mappings[type.var] = new_type_var()
     return instantiate(type.body, mappings)
-  print(f"FOUND: {type}")
-  return NilType
   assert False
 
 def free_vars_of_type(type: PolyType) -> set[str]:
@@ -132,11 +128,14 @@ def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
   if isinstance(type1, TypeVariable):
     return Substitution({type1.name: type2})
   if isinstance(type2, UnionType):
+    s = Substitution({})
     left_s = unify(type1, type2.left)
-    if isinstance(left_s, Substitution): return left_s
+    if isinstance(left_s, Substitution):
+      s = left_s.apply_subst(s)
     right_s = unify(type1, type2.right)
-    if isinstance(right_s, Substitution): return right_s
-    return left_s
+    if isinstance(right_s, Substitution):
+      s = right_s.apply_subst(s)
+    return s
   if isinstance(type1, UnionType):
     left_s = unify(type1.left, type2)
     if isinstance(left_s, str): return left_s
@@ -160,13 +159,13 @@ def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
     return f"Types dont unify: '{type1}' and '{type2}'"
   if type1.name != type2.name:
     return f"Types dont unify: Expected '{type2.name}', got '{type1.name}'"
-  if type1.name == "tuple" and type2.name == "tuple":
-    s = Substitution({})
-    for a, b in zip(type1.args, type2.args):
-      res = unify(a, b)
-      if isinstance(res, str): return res
-      s = res.apply_subst(res)
-    return s
+  # if type1.name == "tuple" and type2.name == "tuple":
+  #   s = Substitution({})
+  #   for a, b in zip(type1.args, type2.args):
+  #     res = unify(a, b)
+  #     if isinstance(res, str): return res
+  #     s = res.apply_subst(res)
+  #   return s
   if len(type1.args) != len(type2.args):
     return f"Types dont unify: Expected '{type1}', but got '{type2}'" 
   if type1.value is not None and type2.value is not None:

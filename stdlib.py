@@ -11,7 +11,9 @@ def tup(*types: MonoType) -> MonoType:
 var = TypeVariable
 
 tostring_a = new_type_var()
+type_a = new_type_var()
 
 ctx: Context = Context({
-  "tostring": fn(tup(tostring_a), tup(StringType), NilType)
+  "tostring": fn(tup(tostring_a), tup(StringType), NilType),
+  "type": fn(tup(type_a), tup(StringType), NilType)
 })

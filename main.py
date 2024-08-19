@@ -4,7 +4,6 @@ from parser import parser, ToAST
 from models import *
 from type_models import *
 from infer import *
-from stdlib import ctx
 
 import sys
 
@@ -15,7 +14,7 @@ with open(file_path) as f:
 def run(code: str) -> None:
   tree: Tree[Any] = parser.parse(code)
   ast = ToAST().transform(tree)
-  res = infer(ast, ctx)
+  res = infer(ast, Context({}))
   print(res[1] if not isinstance(res, UnifyError) else f"{res.location}: {res.message}")
 
 if __name__ == "__main__":

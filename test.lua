@@ -1,7 +1,12 @@
-local result = 0
-if true then
-  local result = "hello"
-  result = "world"
-  return result
+function union()
+  -- @return string | number
+  return "str"
 end
-return result
+
+local res = union
+
+if type(res) == "table" then
+  return res
+end
+
+return 1

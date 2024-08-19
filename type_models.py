@@ -36,7 +36,7 @@ class TypeConstructor:
     if self.name == "function":
       vararg: list[str] = ["..."] if self.value else []
       params = ", ".join([str(a) for a in cast(TypeConstructor, self.args[0]).args] + vararg)
-      rets = ", ".join(str(r) for r in self.args[1].args) if isinstance(self.args[1], TypeConstructor) else repr(self.args[1])
+      rets = ", ".join(f"({r})" if " " in f"{r}" else f"{r}" for r in self.args[1].args) if isinstance(self.args[1], TypeConstructor) else repr(self.args[1])
       return f"({params}) -> {rets}"
     if self.name == "tuple":
       if len(self.args) == 1:
@@ -67,7 +67,7 @@ def array_repr(table: 'TableType') -> str | Literal[False]:
     return False
   if len(filtered) == 1:
     return f"{filtered[0]}[]"
-  return f"()[]"
+  return f"[]"
 
 def is_array(table: 'TableType') -> bool:
   for k, v in table.fields:
@@ -98,17 +98,31 @@ class TableType:
       return left + "....." + right
     return s
 
+typeof = type
+
 @dataclass
 class UnionType:
   left: MonoType
   right: MonoType
+  def collect(self) -> list[MonoType]:
+    left = [self.left]
+    if isinstance(self.left, UnionType):
+      left = self.left.collect()
+    right = [self.right]
+    if isinstance(self.right, UnionType):
+      right = self.right.collect()
+    return left + right
   def __repr__(self) -> str:
     from type_helpers import unify
-    if not isinstance(unify(self.left, self.right), str):
-      return repr(self.right)
-    if not isinstance(unify(self.right, self.left), str):
-      return repr(self.left)
-    return f"{self.left} | {self.right}"
+    types = self.collect()
+    filtered = []
+    for type in types:
+      for filt in filtered:
+        if not isinstance((s := unify(type, filt)), str):
+          break
+      else:
+        filtered.append(type)
+    return " | ".join(f"({f})" if " " in f"{f}" else f"{f}" for f in filtered)
 
 @dataclass
 class ForallType:
