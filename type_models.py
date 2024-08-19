@@ -65,7 +65,9 @@ def array_repr(table: 'TableType') -> str | Literal[False]:
   filtered = [repr(f) for f in filtered]
   if len(filtered) > 1:
     return False
-  return f"{filtered[0]}[]"
+  if len(filtered) == 1:
+    return f"{filtered[0]}[]"
+  return f"()[]"
 
 def is_array(table: 'TableType') -> bool:
   for k, v in table.fields:
@@ -101,6 +103,11 @@ class UnionType:
   left: MonoType
   right: MonoType
   def __repr__(self) -> str:
+    from type_helpers import unify
+    if not isinstance(unify(self.left, self.right), str):
+      return repr(self.right)
+    if not isinstance(unify(self.right, self.left), str):
+      return repr(self.left)
     return f"{self.left} | {self.right}"
 
 @dataclass

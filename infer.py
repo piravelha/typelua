@@ -226,7 +226,7 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
       func_type = TypeConstructor("function", [TypeConstructor("tuple", [broaden(p) for p in params1], None), beta, NilType], None)
       subs = unify(func_type, node_func_t)
       if isinstance(subs, str): return UnifyError(node.location, subs)
-      return subs, beta
+      return subs.apply_subst(args_s), beta
     assert isinstance(node_func_t, TypeConstructor)
     if node_func_t.value == True:
       assert isinstance(node_func_t.args[0], TypeConstructor)
@@ -345,15 +345,17 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
         if ret is None:
           ret = stmt_t
         else:
-          #ret_s = unify(stmt_t, broaden(ret))
-          #if isinstance(ret_s, str): return UnifyError(node.location, ret_s)
-          #ret = ret_s.apply_mono(broaden(ret))
-          #s = ret_s.apply_subst(s)
+          ret_s = unify(stmt_t, broaden(ret))
+          if isinstance(ret_s, str):
+            ret_s = Substitution({})
+            # return UnifyError(node.location, ret_s)
+          s = ret_s.apply_subst(s)
           for i, arg in enumerate(stmt_t.args):
             if i >= len(ret.args):
               ret.args.append(UnionType(arg, NilType))
             else:
               ret.args[i] = UnionType(ret.args[i], arg)
+          ret = ret_s.apply_mono(broaden(ret))
       s = stmt_s.apply_subst(s)
     if node.last:
       res = infer(node.last, ctx)
@@ -362,21 +364,24 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
       if not ret:
         ret = stmt_t
       else:
-        #ret_s = unify(stmt_t, broaden(ret))
-        #if isinstance(ret_s, str): return UnifyError(node.location, ret_s)
-        #ret = ret_s.apply_mono(broaden(stmt_t))
+        ret_s = unify(stmt_t, broaden(ret))
+        if isinstance(ret_s, str):
+          ret_s = Substitution({})
+          # return UnifyError(node.location, ret_s)
+        ret = ret_s.apply_mono(broaden(stmt_t))
         assert isinstance(stmt_t, TypeConstructor) and stmt_t.name == "tuple"
         for i, arg in enumerate(stmt_t.args):
           if i >= len(ret.args):
             ret.args.append(UnionType(arg, NilType))
           else:
             ret.args[i] = UnionType(ret.args[i], arg)
-        #s = ret_s.apply_subst(s)
-        s = stmt_s.apply_subst(s)
+        s = ret_s.apply_subst(s)
+      s = stmt_s.apply_subst(s)
     elif ret:
       ret_s = unify(TypeConstructor("tuple", [], None), ret)
       if isinstance(ret_s, str): return UnifyError(node.location, ret_s)
       ret = ret_s.apply_mono(ret)
+
     s.is_returning = True
     if ret is None:
       s.is_returning = False

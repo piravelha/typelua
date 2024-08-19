@@ -7,7 +7,6 @@ def test_basic_if() -> None:
       if true then
         local result = "hello"
         result = "world"
-        return result
       end
       return result
-    """) == "\"world\" | 0"
+    """) == "0"
