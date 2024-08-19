@@ -24,7 +24,11 @@ func_decl: "local" "function" NAME "(" [params] ")" chunk "end"
 func_expr: "function" "(" [params] ")" chunk "end"
 params: names ["," ELLIPSIS] | ELLIPSIS
 
-var_assign: names "=" exprs
+var_assign: assignables "=" exprs
+assignables: assignable ("," assignable)*
+?assignable: NAME
+           | prop_expr
+           | index_expr
 var_decl: "local" names "=" exprs
 
 exprs: expr ("," expr)*

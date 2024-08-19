@@ -13,6 +13,49 @@ class UnifyError:
 
 UnifyResult: TypeAlias = UnifyError | tuple[Substitution, MonoType]
 
+def set_path(prefix: Expr, value: MonoType, ctx: Context) -> UnifyError | None:
+  def get_base(expr: Expr) -> tuple['MonoType | UnifyError', list[MonoType]]:
+    if isinstance(expr, Var):
+      res = ctx.mapping[expr.name]
+      if isinstance(res, ForallType):
+        res_t = res.body
+      else: assert False
+      return res_t, []
+    elif isinstance(expr, IndexExpr):
+      base, path = get_base(expr.obj)
+      if isinstance(base, UnifyError): return base, []
+      ind = infer(expr.index, ctx)
+      if isinstance(ind, UnifyError): return ind, []
+      ind_s, ind_t = ind
+      return base, path + [ind_t]
+    assert False
+  if isinstance(prefix, IndexExpr):
+    base, paths = get_base(prefix)
+    if isinstance(base, UnifyError): return base
+    cur_path = base
+    for path in paths[:-1]:
+      assert isinstance(cur_path, TableType)
+      for k, v in cur_path.fields:
+        if not isinstance(unify(path, k), str):
+          cur_path = v
+          break
+    assert isinstance(cur_path, TableType)
+    new: list[tuple[MonoType, MonoType]] = []
+    found = False
+    for tup in cur_path.fields:
+      k, v = tup
+      if not isinstance(unify(paths[-1], k), str):
+        new.append((k, value))
+        found = True
+        continue
+      new.append((k, v))
+    if not found:
+      cur_path.fields.append((paths[-1], value))  
+    else:
+      cur_path.fields = new
+  return None
+
+
 def infer(node: BaseNode, ctx: Context) -> UnifyResult:
   global global_ctx
   if isinstance(node, Var):
@@ -220,8 +263,20 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
       else:
         exprs.append(expr_t)
       s = expr_s.apply_subst(s)
-    for i, name in enumerate(node.names):
-      global_ctx.mapping[name] = exprs[i]
+    for i, prefix in enumerate(node.names):
+      if not isinstance(prefix, Var):
+        err = set_path(prefix, exprs[i], ctx)
+        if err:
+          return err
+        continue
+      if ctx.mapping.get(prefix.name):
+        existing = instantiate(ctx.mapping[prefix.name])
+        subs = unify(exprs[i], broaden(existing))
+        if isinstance(subs, str): return UnifyError(node.location, subs)
+        ctx.mapping[prefix.name] = subs.apply_mono(exprs[i])
+      else:
+        ctx.mapping[prefix.name] = exprs[i]
+        global_ctx.mapping[prefix.name] = exprs[i]
     return s, NilType
   elif isinstance(node, ReturnStmt):
     exprs = []

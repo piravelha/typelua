@@ -99,7 +99,7 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
       is_vararg = params.children[0] is not None
     if not loc:
       loc = Location(file_path, 0, 0)
-    return VarAssign(get_loc(name), [name.value], [FuncExpr(loc, param_strs, is_vararg, body)])
+    return VarAssign(get_loc(name), [Var(get_loc(name), name.value)], [FuncExpr(loc, param_strs, is_vararg, body)])
   def func_decl(self, args: tuple[Token, Tree[Any] | None, Chunk]) -> BaseNode:
   
     name, params, body = args
@@ -123,12 +123,13 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
     return VarDecl(get_loc(name), [name.value], [FuncExpr(loc, param_strs, is_vararg, body)])
   def var_assign(self, args: tuple[Tree[Any], Tree[Any]]) -> BaseNode:
     names, exprs = args
-    name_strs: list[str] = []
+    name_strs: list[Expr] = []
     expr_exprs: list[Expr] = []
     for name in names.children:
-      assert isinstance(name, Token)
-      assert isinstance(name.value, str)
-      name_strs.append(name.value)
+      if isinstance(name, str):
+        name = Var(Location(file_path, 0, 0), name)
+      assert is_expr(name)
+      name_strs.append(name)
     for expr in exprs.children:
       assert is_expr(expr)
       expr_exprs.append(expr)

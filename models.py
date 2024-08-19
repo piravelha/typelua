@@ -92,7 +92,7 @@ class VarDecl(BaseNode):
 
 @dataclass
 class VarAssign(BaseNode):
-  names: list[str]
+  names: list[Expr]
   exprs: list[Expr]
 
 @dataclass
