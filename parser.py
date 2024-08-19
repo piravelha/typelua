@@ -200,7 +200,7 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
     return UnaryExpr(get_loc(op), op.value, expr)
   def var(self, args: tuple[Token]) -> BaseNode:
     return Var(get_loc(args[0]), args[0].value)
-  def ELLIPSIS(self, token) -> BaseNode:
+  def ELLIPSIS(self, token: Token) -> BaseNode:
     return Vararg(get_loc(token))
   def NIL(self, token: Token) -> BaseNode:
     return Nil(get_loc(token))
