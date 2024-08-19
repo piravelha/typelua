@@ -300,6 +300,11 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
           exprs.append(expr_t)
       s = expr_s.apply_subst_unsafe(s)
     return s, TypeConstructor("tuple", exprs, None)
+  elif isinstance(node, IfStmt):
+    res = infer(node.body, ctx)
+    if isinstance(res, UnifyError): return res
+    body_s, body_t = res
+    return body_s, body_t
   elif isinstance(node, Chunk):
     ctx = Context(ctx.mapping.copy())
     ret: MonoType | None = None
