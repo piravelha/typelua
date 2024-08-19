@@ -34,7 +34,7 @@ def new_type_var() -> TypeVariable:
   var_count += 1
   return TypeVariable(f"t{var_count}")
 
-def instantiate(type: PolyType | MonoType, mappings: dict[str, TypeVariable] = {}) -> MonoType:
+def instantiate(type: PolyType, mappings: dict[str, TypeVariable] = {}) -> MonoType:
   if isinstance(type, TypeVariable):
     if type.name in mappings:
       return mappings[type.name]
@@ -48,7 +48,7 @@ def instantiate(type: PolyType | MonoType, mappings: dict[str, TypeVariable] = {
     return instantiate(type.body, mappings)
   assert False
 
-def free_vars_of_type(type: PolyType | MonoType) -> set[str]:
+def free_vars_of_type(type: PolyType) -> set[str]:
   if isinstance(type, TypeVariable):
     return {type.name}
   elif isinstance(type, TypeConstructor):
@@ -77,9 +77,9 @@ def unify(type1: MonoType, type2: MonoType) -> Optional[Substitution]:
     return Substitution({type1.name: type2})
   if isinstance(type1, TableType) and isinstance(type2, TableType):
     s = Substitution({})
-    for (k1, v1) in type1.fields:
-      v: MonoType | None = None
-      for k2, v2 in type2.fields:
+    for (k1, v1) in type2.fields:
+      v: 'MonoType | None' = None
+      for k2, v2 in type1.fields:
         if unify(k1, k2) is not None:
           v = v2
           break

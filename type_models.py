@@ -22,6 +22,10 @@ class TypeConstructor:
   args: list[MonoType]
   value: Any
 
+NumberType = TypeConstructor("number", [], None)
+StringType = TypeConstructor("string", [], None)
+BooleanType = TypeConstructor("boolean", [], None)
+
 @dataclass
 class TableType:
   fields: list[tuple[MonoType, MonoType]]
