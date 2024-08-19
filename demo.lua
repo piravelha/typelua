@@ -1,10 +1,13 @@
 
 function factorial(x)
-  --@return string
-  if x <= 1 then
+  --@return number
+  if x .. "!" == "a!" then
     return 1
   end
-  return x * factorial(x - 1)
+  return #x + factorial(x)
 end
 
-return factorial
+return function(x, y)
+  return factorial(x .. tostring(y))
+end
+

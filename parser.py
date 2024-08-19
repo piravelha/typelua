@@ -1,5 +1,5 @@
 from lark import Lark, Transformer, Token, Tree
-from typing import Any
+from typing import Any, cast
 from models import *
 from type_models import *
 
@@ -151,7 +151,7 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
     ret = None
     for arg in args:
       if arg.data == "return_type_annotation":
-        ret = arg.children[0]
+        ret = cast(MonoType, arg.children[0])
     return FuncAnnotation(Location(file_path, 0, 0), ret)
   def index_expr(self, args: tuple[Expr, Expr]) -> BaseNode:
     obj, index = args
@@ -212,7 +212,7 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
     return Var(get_loc(args[0]), args[0].value)
   def tuple_type(self, args: list[MonoType]) -> MonoType:
     return TypeConstructor("tuple", args, None)
-  def PRIMITIVE_TYPE(self, token):
+  def PRIMITIVE_TYPE(self, token: Token) -> MonoType:
     if token.value == "number":
       return NumberType
     elif token.value == "string":

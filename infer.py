@@ -20,6 +20,7 @@ def set_path(prefix: Expr, value: MonoType, ctx: Context) -> UnifyError | None:
       if isinstance(res, ForallType):
         res_t = res.body
       else: assert False
+      assert not isinstance(res, ForallType)
       return res_t, []
     elif isinstance(expr, IndexExpr):
       base, path = get_base(expr.obj)
@@ -67,7 +68,7 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
     if node.name in global_ctx.mapping:
       val = instantiate(global_ctx.mapping[node.name])
       return Substitution({node.name: val}), val
-    assert False, f"Unknown identifier: {node.name}"
+    return UnifyError(node.location, f"Unbound identifier: '{node.name}'")
   elif isinstance(node, Nil):
     return Substitution({}), TypeConstructor("nil", [], None)
   elif isinstance(node, Number):
@@ -125,8 +126,10 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
       if isinstance(num_s, str): return UnifyError(node.location, num_s)
       return num_s.apply_subst(value_s), NumberType
     elif node.op == "#":
-      tbl_s = unify(value_t, TableType([]))
-      if isinstance(tbl_s, str): return UnifyError(node.location, tbl_s)
+      # TODO: add union types DONE
+      tbl_s = unify(value_t, UnionType(TableType([]), StringType))
+      if isinstance(tbl_s, str):
+        return UnifyError(node.location, tbl_s)
       return tbl_s.apply_subst(value_s), NumberType
     elif node.op == "not":
       bool_s = unify(value_t, BooleanType)
@@ -168,7 +171,7 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
       eq2_s = unify(left_t, right_t)
       if not isinstance(eq2_s, str):
         s = eq2_s.apply_subst(s)
-      return s, BooleanType
+      return left_s.apply_subst(right_s.apply_subst(s)), BooleanType
     elif node.op in ["and", "or"]:
       bool_left_s = unify(left_t, BooleanType)
       if isinstance(bool_left_s, str): return UnifyError(node.location, bool_left_s)
@@ -210,9 +213,9 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
       arg_s, arg_t = res
       args_s = arg_s.apply_subst(args_s)
       if isinstance(arg_t, TypeConstructor) and arg_t.name == "tuple":
-        params1.extend(arg_t.args)
+        params1.extend([broaden(a) for a in arg_t.args])
       else:
-        params1.append(arg_t)
+        params1.append(broaden(arg_t))
     beta = new_type_var()
     res = infer(node.func, ctx)
     if isinstance(res, UnifyError): return res
@@ -316,7 +319,7 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
     if isinstance(res, UnifyError): return res
     cond_s, cond_t = res
     bool_cond_s = unify(cond_t, BooleanType)
-    if isinstance(bool_cond_s, str): return UnifyError(bool_cond_s)
+    if isinstance(bool_cond_s, str): return UnifyError(node.location, bool_cond_s)
     res = infer(node.body, ctx)
     if isinstance(res, UnifyError): return res
     body_s, body_t = res
@@ -359,7 +362,7 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
     elif ret:
       ret_s = unify(TypeConstructor("tuple", [], None), ret)
       if isinstance(ret_s, str): return UnifyError(node.location, ret_s)
-      ret = ret_s.apply_subst(ret)
+      ret = ret_s.apply_mono(ret)
     if ret is None:
       ret = TypeConstructor("tuple", [], None)
     return s, ret

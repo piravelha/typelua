@@ -17,6 +17,8 @@ class Substitution:
       return TypeConstructor(m.name, [self.apply_mono(a) for a in m.args], m.value)
     elif isinstance(m, TableType):
       return TableType([(a, self.apply_mono(b)) for a, b in m.fields])
+    elif isinstance(m, UnionType):
+      return UnionType(self.apply_mono(m.left), self.apply_mono(m.right))
     assert False, f"Unknown type: {m}"
   def apply_poly(self, p: PolyType) -> PolyType:
     if isinstance(p, (TypeVariable, TypeConstructor)):
@@ -41,8 +43,6 @@ class Substitution:
       new[n] = self.apply_mono(t)
     return Substitution(new)
 
-
-
 var_count = 0
 def new_type_var() -> TypeVariable:
   global var_count
@@ -54,6 +54,12 @@ def intersect(type1: MonoType, type2: MonoType) -> MonoType:
     return type2
   if isinstance(type2, TypeVariable):
     return type1
+  if isinstance(type2, UnionType):
+    if not isinstance(unify(type1, type2.left), str):
+      return intersect(type1, type2.left)
+    return intersect(type1, type2.right)
+  if isinstance(type1, UnionType):
+    return intersect(type2, type1)
   if isinstance(type1, TableType) and isinstance(type2, TableType):
     fields = type1.fields + type2.fields
     return TableType(fields)
@@ -72,6 +78,7 @@ def intersect(type1: MonoType, type2: MonoType) -> MonoType:
     return TypeConstructor(type1.name, args, type1.value)
   print(f"(DEBUG 2) Never type detected")
   #exit(1)
+  assert False
 
 def instantiate(type: PolyType, mappings: dict[str, TypeVariable] = {}) -> MonoType:
   if isinstance(type, TypeVariable):
@@ -82,9 +89,13 @@ def instantiate(type: PolyType, mappings: dict[str, TypeVariable] = {}) -> MonoT
     return TypeConstructor(type.name, [instantiate(a, mappings) for a in type.args], type.value)
   elif isinstance(type, TableType):
     return TableType([(instantiate(k, mappings), instantiate(v, mappings)) for k, v in type.fields])
+  elif isinstance(type, UnionType):
+    return UnionType(instantiate(type.left), instantiate(type.right))
   elif isinstance(type, ForallType):
     mappings[type.var] = new_type_var()
     return instantiate(type.body, mappings)
+  print(f"FOUND: {type}")
+  return NilType
   assert False
 
 def free_vars_of_type(type: PolyType) -> set[str]:
@@ -94,6 +105,8 @@ def free_vars_of_type(type: PolyType) -> set[str]:
     return {v for arg in type.args for v in free_vars_of_type(arg)}
   elif isinstance(type, TableType):
     return {x for k, v in type.fields for x in free_vars_of_type(k) | free_vars_of_type(v)}
+  elif isinstance(type, UnionType):
+    return free_vars_of_type(type.left) | free_vars_of_type(type.right)
   elif isinstance(type, ForallType):
     return free_vars_of_type(type.body) - {type.var}
 
@@ -114,6 +127,18 @@ def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
     return Substitution({type2.name: type1})
   if isinstance(type1, TypeVariable):
     return Substitution({type1.name: type2})
+  if isinstance(type2, UnionType):
+    left_s = unify(type1, type2.left)
+    if isinstance(left_s, Substitution): return left_s
+    right_s = unify(type1, type2.right)
+    if isinstance(right_s, Substitution): return right_s
+    return left_s
+  if isinstance(type1, UnionType):
+    left_s = unify(type1.left, type2)
+    if isinstance(left_s, str): return left_s
+    right_s = unify(type1.right, type2)
+    if isinstance(right_s, str): return right_s
+    return left_s.apply_subst(right_s)
   if isinstance(type1, TableType) and isinstance(type2, TableType):
     s = Substitution({})
     for (k1, v1) in type1.fields:
@@ -128,12 +153,11 @@ def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
       s = v_res.apply_subst(s)
     return s
   if not isinstance(type1, TypeConstructor) or not isinstance(type2, TypeConstructor):
-    assert False
     return f"Types dont unify: '{type1}' and '{type2}'"
   if type1.name != type2.name:
-    return f"Names of types dont match: Expected '{type2.name}', got '{type1.name}'"
+    return f"Types dont unify: Expected '{type2.name}', got '{type1.name}'"
   if len(type1.args) != len(type2.args):
-    return f"Generic types have a different count of generic arguments: '{type1}' and '{type2}'" 
+    return f"Types dont unify: Expected '{type1}', but got '{type2}'" 
   if type1.value is not None and type2.value is not None:
     if type1.value != type2.value:
       return f"Type '{type1}' does not extend type '{type2}'" 

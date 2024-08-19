@@ -5,6 +5,7 @@ MonoType: TypeAlias = """
   TypeVariable
   | TypeConstructor
   | TableType
+  | UnionType
 """
 
 PolyType: TypeAlias = """
@@ -68,6 +69,13 @@ class TableType:
       right = s[-int(max_repr/2):]
       return left + "....." + right
     return s
+
+@dataclass
+class UnionType:
+  left: MonoType
+  right: MonoType
+  def __repr__(self) -> str:
+    return f"{self.left} | {self.right}"
 
 @dataclass
 class ForallType:
