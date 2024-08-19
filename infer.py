@@ -301,10 +301,23 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
       s = expr_s.apply_subst_unsafe(s)
     return s, TypeConstructor("tuple", exprs, None)
   elif isinstance(node, IfStmt):
+    res = infer(node.cond, ctx)
+    if isinstance(res, UnifyError): return res
+    cond_s, cond_t = res
+    bool_cond_s = unify(cond_t, BooleanType)
+    if isinstance(bool_cond_s, str): return UnifyError(bool_cond_s)
     res = infer(node.body, ctx)
     if isinstance(res, UnifyError): return res
     body_s, body_t = res
-    return body_s, body_t
+    if node.else_stmt:
+      res = infer(node.else_stmt, ctx)
+      if isinstance(res, UnifyError): return res
+      else_s, else_t = res
+      body_s = else_s.apply_subst(body_s)
+      subs = unify(else_t, broaden(body_t))
+      if isinstance(subs, str): return UnifyError(node.location, subs)
+      body_t = subs.apply_mono(broaden(else_t))
+    return body_s.apply_subst(cond_s), cond_s.apply_mono(body_t)
   elif isinstance(node, Chunk):
     ctx = Context(ctx.mapping.copy())
     ret: MonoType | None = None
@@ -332,6 +345,10 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
       ret = ret_s.apply_mono(ret)
       s = ret_s.apply_subst(s)
       s = stmt_s.apply_subst(s)
+    else:
+      ret_s = unify(TypeConstructor("tuple", [], None), ret)
+      if isinstance(ret_s, str): return UnifyError(node.location, ret_s)
+      ret = ret_s.apply_subst(ret)
     if ret is None:
       ret = TypeConstructor("tuple", [NilType], None)
     return s, ret

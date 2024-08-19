@@ -154,5 +154,5 @@ def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
 
 def broaden(type: MonoType) -> MonoType:
   if isinstance(type, TypeConstructor):
-    return TypeConstructor(type.name, type.args, None)
+    return TypeConstructor(type.name, [broaden(a) for a in type.args], None)
   return type

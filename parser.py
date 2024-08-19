@@ -28,7 +28,7 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
     for arg in args:
       if isinstance(arg, ReturnStmt):
         ret = arg
-      else:
+      elif arg:
         stmts.append(arg)
         loc = loc or arg.location
     return Chunk(loc or Location(file_path, 0, 0), stmts, ret)
