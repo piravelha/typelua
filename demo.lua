@@ -1,20 +1,4 @@
 
--- (((a) -> b), a) -> b
-function apply(x, y)
-  return x(y)
-end
+local arr = {1, 2, 3, 4, 5}
 
--- (string) -> string
-function f(x)
-  return x .. "!"
-end
-
--- (number) -> number
-function g(y)
-  return y + 1
-end
-
--- (string, number)
-return apply(f, "!"), apply(g, 10)
-
-
+return arr[5]

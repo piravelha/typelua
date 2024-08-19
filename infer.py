@@ -52,7 +52,7 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
       v_subst, v_type = v_res
       s = k_subst.apply_subst(s)
       s = v_subst.apply_subst(s)
-      types.append((k_type, v_type))
+      types.append((k_type, broaden(v_type)))
     return s, TableType(types)
   elif isinstance(node, IndexExpr):
     res = infer(node.obj, ctx)
@@ -206,7 +206,7 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
         exprs.append(expr_t)
       s = expr_s.apply_subst(s)
     for i, name in enumerate(node.names):
-      ctx.mapping[name] = Forall(name, exprs[i])
+      ctx.mapping[name] = ForallType(name, exprs[i])
     return s, NilType
   elif isinstance(node, VarAssign):
     exprs = []

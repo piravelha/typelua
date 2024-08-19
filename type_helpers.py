@@ -115,7 +115,7 @@ def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
     for (k1, v1) in type1.fields:
       v: 'MonoType | None' = None
       for k2, v2 in type2.fields:
-        if unify(k1, k2) is not None:
+        if not isinstance(unify(k1, k2), str):
           v = v2
           break
       if v is None: return f"Field '{k1}' expected on type '{type2}', but was not found"
