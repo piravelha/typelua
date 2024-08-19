@@ -1,6 +1,9 @@
 
 ?start: chunk
 
+?type: PRIMITIVE_TYPE
+tuple_type: type ("," type)*
+
 chunk: stmt* [last_stmt]
 
 ?stmt: var_decl
@@ -19,10 +22,13 @@ else_stmt: "else" chunk
 
 return_stmt: "return" exprs
 
-func_assign: "function" NAME "(" [params] ")" chunk "end"
-func_decl: "local" "function" NAME "(" [params] ")" chunk "end"
-func_expr: "function" "(" [params] ")" chunk "end"
+func_assign: "function" NAME "(" [params] ")" func_annotations chunk "end"
+func_decl: "local" "function" NAME "(" [params] ")" func_annotations chunk "end"
+func_expr: "function" "(" [params] ")" func_annotations chunk "end"
 params: names ["," ELLIPSIS] | ELLIPSIS
+func_annotations: func_annotation*
+?func_annotation: return_type_annotation
+return_type_annotation: "--" "@return" tuple_type
 
 var_assign: assignables "=" exprs
 assignables: assignable ("," assignable)*
@@ -83,6 +89,8 @@ table_field: expr
              | func_call
              | "(" expr ")"
 
+PRIMITIVE_TYPE: "number"
+
 ELLIPSIS: "..."
 LOG_OP: "and" | "or"
 EQ_OP: "==" | "~="
@@ -99,4 +107,4 @@ NUMBER: /-?\d+(\.\d+)?/
 NAME: /(?!return)[a-zA-Z_]\w*/
 
 %ignore /\s+/
-%ignore /--.*/
+//%ignore /--.*/

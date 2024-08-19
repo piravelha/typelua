@@ -1,6 +1,10 @@
 
-local obj = {}
-obj.a = {"hello"}
-obj.a.b = {"not 123"}
-obj.a.b[1] = 123
-return obj
+function factorial(x)
+  --@return number
+  if x <= 1 then
+    return 1
+  end
+  return x * factorial(x - 1)
+end
+
+return factorial

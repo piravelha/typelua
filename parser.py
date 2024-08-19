@@ -1,6 +1,7 @@
 from lark import Lark, Transformer, Token, Tree
 from typing import Any
 from models import *
+from type_models import *
 
 import sys
 
@@ -32,8 +33,8 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
         stmts.append(arg)
         loc = loc or arg.location
     return Chunk(loc or Location(file_path, 0, 0), stmts, ret)
-  def func_expr(self, args: tuple[Tree[Any] | None, Chunk]) -> BaseNode:
-    params, body = args
+  def func_expr(self, args: tuple[Tree[Any] | None, FuncAnnotation, Chunk]) -> BaseNode:
+    params, annotation, body = args
     param_strs: list[str] = []
     is_vararg: bool = False
     loc: Location | None = None
@@ -51,7 +52,7 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
       is_vararg = params.children[0] is not None
     if not loc:
       loc = Location(file_path, 0, 0)
-    return FuncExpr(loc, param_strs, is_vararg, body)
+    return FuncExpr(loc, param_strs, is_vararg, body, None, annotation)
   
   def if_stmt(self, args: tuple[Expr, Chunk, Tree[Any], Tree[Any] | None]) -> BaseNode:
     cond, body, elseif_stmts, else_stmt = args
@@ -80,8 +81,8 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
     if not loc:
       loc = Location(file_path, 0, 0)
     return ReturnStmt(loc, expr_exprs)
-  def func_assign(self, args: tuple[Token, Tree[Any] | None, Chunk]) -> BaseNode:
-    name, params, body = args
+  def func_assign(self, args: tuple[Token, Tree[Any] | None, FuncAnnotation, Chunk]) -> BaseNode:
+    name, params, annotation, body = args
     param_strs: list[str] = []
     is_vararg: bool = False
     loc: Location | None = None
@@ -99,10 +100,11 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
       is_vararg = params.children[0] is not None
     if not loc:
       loc = Location(file_path, 0, 0)
-    return VarAssign(get_loc(name), [Var(get_loc(name), name.value)], [FuncExpr(loc, param_strs, is_vararg, body)])
-  def func_decl(self, args: tuple[Token, Tree[Any] | None, Chunk]) -> BaseNode:
+    print(annotation)
+    return VarAssign(get_loc(name), [Var(get_loc(name), name.value)], [FuncExpr(loc, param_strs, is_vararg, body, name.value, annotation)])
+  def func_decl(self, args: tuple[Token, Tree[Any] | None, FuncAnnotation, Chunk]) -> BaseNode:
   
-    name, params, body = args
+    name, params, annotation, body = args
     param_strs: list[str] = []
     is_vararg: bool = False
     loc: Location | None = None
@@ -120,7 +122,7 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
       is_vararg = params.children[0] is not None
     if not loc:
       loc = Location(file_path, 0, 0)
-    return VarDecl(get_loc(name), [name.value], [FuncExpr(loc, param_strs, is_vararg, body)])
+    return VarDecl(get_loc(name), [name.value], [FuncExpr(loc, param_strs, is_vararg, body, name.value, annotation)])
   def var_assign(self, args: tuple[Tree[Any], Tree[Any]]) -> BaseNode:
     names, exprs = args
     name_strs: list[Expr] = []
@@ -146,6 +148,12 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
       assert is_expr(expr)
       expr_exprs.append(expr)
     return VarDecl(expr_exprs[0].location, name_strs, expr_exprs)
+  def func_annotations(self, args: list[Tree[Any]]) -> FuncAnnotation:
+    ret = None
+    for arg in args:
+      if arg.data == "return_type_annotation":
+        ret = arg.children[0]
+    return FuncAnnotation(Location(file_path, 0, 0), ret)
   def index_expr(self, args: tuple[Expr, Expr]) -> BaseNode:
     obj, index = args
     return IndexExpr(obj.location, obj, index)
@@ -203,6 +211,18 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
     return UnaryExpr(get_loc(op), op.value, expr)
   def var(self, args: tuple[Token]) -> BaseNode:
     return Var(get_loc(args[0]), args[0].value)
+  def tuple_type(self, args: list[MonoType]) -> MonoType:
+    return TypeConstructor("tuple", args, None)
+  def PRIMITIVE_TYPE(self, token):
+    if token.value == "number":
+      return NumberType
+    elif token.value == "string":
+      return StringType
+    elif token.value == "boolean":
+      return BooleanType
+    elif token.value == "nil":
+      return NilType
+    assert False
   def ELLIPSIS(self, token: Token) -> BaseNode:
     return Vararg(get_loc(token))
   def NIL(self, token: Token) -> BaseNode:

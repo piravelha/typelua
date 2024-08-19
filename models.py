@@ -1,5 +1,8 @@
 from dataclasses import dataclass
-from typing import TypeAlias, Union, Optional, TypeGuard, Any
+from typing import TypeAlias, Union, Optional, TypeGuard, Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+  from type_models import MonoType
 
 @dataclass
 class Location:
@@ -100,6 +103,12 @@ class FuncExpr(BaseNode):
   params: list[str]
   is_vararg: bool
   body: 'Chunk'
+  name: Optional[str]
+  annotation: 'FuncAnnotation'
+
+@dataclass
+class FuncAnnotation(BaseNode):
+  ret_type: Optional['MonoType']
 
 @dataclass
 class ReturnStmt(BaseNode):

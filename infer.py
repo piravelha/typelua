@@ -187,10 +187,16 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
       var = new_type_var()
       ctx.mapping["..."] = TableType([(NumberType, var)])
     param_tuple = TypeConstructor("tuple", param_types, None)
+    if node.annotation.ret_type is not None and node.name is not None:
+      ctx.mapping[node.name] = TypeConstructor("function", [param_tuple, node.annotation.ret_type, NilType], None)
     res = infer(node.body, ctx)
     if isinstance(res, UnifyError): return res
     body_s, body_t = res
     params = body_s.apply_mono(param_tuple)
+    if node.annotation.ret_type is not None:
+      ret_anno_s = unify(body_t, node.annotation.ret_type)
+      if isinstance(ret_anno_s, str): return UnifyError(node.location, ret_anno_s)
+      body_t = ret_anno_s.apply_mono(body_t)
     return body_s, TypeConstructor("function", [params, body_t, var], is_vararg)
   elif isinstance(node, FuncCall):
     params1: list[MonoType] = []
@@ -347,12 +353,12 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
       ret = ret_s.apply_mono(ret)
       s = ret_s.apply_subst(s)
       s = stmt_s.apply_subst(s)
-    else:
+    elif ret:
       ret_s = unify(TypeConstructor("tuple", [], None), ret)
       if isinstance(ret_s, str): return UnifyError(node.location, ret_s)
       ret = ret_s.apply_subst(ret)
     if ret is None:
-      ret = TypeConstructor("tuple", [NilType], None)
+      ret = TypeConstructor("tuple", [], None)
     return s, ret
   assert False, f"Not implemented: {node}"
 

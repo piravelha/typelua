@@ -124,6 +124,7 @@ def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
       s = v_res.apply_subst(s)
     return s
   if not isinstance(type1, TypeConstructor) or not isinstance(type2, TypeConstructor):
+    assert False
     return f"Types dont unify: '{type1}' and '{type2}'"
   if type1.name != type2.name:
     return f"Names of types dont match: Expected '{type2.name}', got '{type1.name}'"
