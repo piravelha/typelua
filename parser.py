@@ -7,21 +7,20 @@ import sys
 
 parser = Lark.open("grammar.lark")
 
-file_path = sys.argv[1]
-
-def get_loc(node: Token | Tree[Any]) -> Location:
-  global file_path
+def get_loc(file_path: str, node: Token | Tree[Any]) -> Location:
   if isinstance(node, Token):
     assert node.line is not None
     assert node.column is not None
     return Location(file_path, node.line, node.column)
   if isinstance(node, Tree):
     if node.meta.empty:
-      return get_loc(node.children[0])
+      return get_loc(file_path, node.children[0])
     return Location(file_path, node.meta.line, node.meta.column)
   assert False, f"get_loc: Argument must be either a Token or a Tree, got {node}"
 
 class ToAST(Transformer[Tree[Any], BaseNode]):
+  def __init__(self, file_path: str):
+    self.file_path = file_path
   def chunk(self, args: list[Stmt | ReturnStmt]) -> BaseNode:
     stmts: list[Stmt] = []
     ret: ReturnStmt | None = None
@@ -32,7 +31,7 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
       elif arg:
         stmts.append(arg)
         loc = loc or arg.location
-    return Chunk(loc or Location(file_path, 0, 0), stmts, ret)
+    return Chunk(loc or Location(self.file_path, 0, 0), stmts, ret)
   def func_expr(self, args: tuple[Tree[Any] | None, FuncAnnotation, Chunk]) -> BaseNode:
     params, annotation, body = args
     param_strs: list[str] = []
@@ -45,13 +44,13 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
       for param in ps.children:
         assert isinstance(param, Token)
         if not loc:
-          loc = get_loc(param)
+          loc = get_loc(self.file_path, param)
         assert isinstance(param.value, str)
         param_strs.append(param.value)
     else:
       is_vararg = params.children[0] is not None
     if not loc:
-      loc = Location(file_path, 0, 0)
+      loc = Location(self.file_path, 0, 0)
     return FuncExpr(loc, param_strs, is_vararg, body, None, annotation)
   
   def if_stmt(self, args: tuple[Expr, Chunk, Tree[Any], Tree[Any] | None]) -> BaseNode:
@@ -80,7 +79,7 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
       if not loc:
         loc = expr.location
     if not loc:
-      loc = Location(file_path, 0, 0)
+      loc = Location(self.file_path, 0, 0)
     return ReturnStmt(loc, expr_exprs)
   def func_assign(self, args: tuple[Token, Tree[Any] | None, FuncAnnotation, Chunk]) -> BaseNode:
     name, params, annotation, body = args
@@ -94,14 +93,14 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
       for param in ps.children:
         assert isinstance(param, Token)
         if not loc:
-          loc = get_loc(param)
+          loc = get_loc(self.file_path, param)
         assert isinstance(param.value, str)
         param_strs.append(param.value)
     else:
       is_vararg = params.children[0] is not None
     if not loc:
-      loc = Location(file_path, 0, 0)
-    return VarAssign(get_loc(name), [Var(get_loc(name), name.value)], [FuncExpr(loc, param_strs, is_vararg, body, name.value, annotation)])
+      loc = Location(self.file_path, 0, 0)
+    return VarAssign(get_loc(self.file_path, name), [Var(get_loc(self.file_path, name), name.value)], [FuncExpr(loc, param_strs, is_vararg, body, name.value, annotation)])
   def func_decl(self, args: tuple[Token, Tree[Any] | None, FuncAnnotation, Chunk]) -> BaseNode:
   
     name, params, annotation, body = args
@@ -115,21 +114,21 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
       for param in ps.children:
         assert isinstance(param, Token)
         if not loc:
-          loc = get_loc(param)
+          loc = get_loc(self.file_path, param)
         assert isinstance(param.value, str)
         param_strs.append(param.value)
     else:
       is_vararg = params.children[0] is not None
     if not loc:
-      loc = Location(file_path, 0, 0)
-    return VarDecl(get_loc(name), [name.value], [FuncExpr(loc, param_strs, is_vararg, body, name.value, annotation)], None)
+      loc = Location(self.file_path, 0, 0)
+    return VarDecl(get_loc(self.file_path, name), [name.value], [FuncExpr(loc, param_strs, is_vararg, body, name.value, annotation)], None)
   def var_assign(self, args: tuple[Tree[Any], Tree[Any]]) -> BaseNode:
     names, exprs = args
     name_strs: list[Expr] = []
     expr_exprs: list[Expr] = []
     for name in names.children:
       if isinstance(name, str):
-        name = Var(Location(file_path, 0, 0), name)
+        name = Var(Location(self.file_path, 0, 0), name)
       assert is_expr(name)
       name_strs.append(name)
     for expr in exprs.children:
@@ -153,9 +152,9 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
     for arg in args:
       if arg.data == "return_type_annotation":
         ret = cast(MonoType, arg.children[0])
-    return FuncAnnotation(Location(file_path, 0, 0), ret)
+    return FuncAnnotation(Location(self.file_path, 0, 0), ret)
   def var_type_annotation(self, args: tuple[MonoType]) -> VarAnnotation:
-    return VarAnnotation(Location(file_path, 0, 0), args[0])
+    return VarAnnotation(Location(self.file_path, 0, 0), args[0])
   def reveal_annotation(self, args: tuple[Expr]) -> RevealAnnotation:
     return RevealAnnotation(args[0].location, args[0])
   def index_expr(self, args: tuple[Expr, Expr]) -> BaseNode:
@@ -186,8 +185,8 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
         prop, expr = field.children
         assert isinstance(prop, Token)
         assert is_expr(expr)
-        fields.append((String(get_loc(prop), prop.value),  expr))
-        loc = get_loc(prop)
+        fields.append((String(get_loc(self.file_path, prop), prop.value),  expr))
+        loc = get_loc(self.file_path, prop)
       elif field.data == "dict_field":
         key, expr = field.children
         assert is_expr(key)
@@ -199,7 +198,7 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
         location = loc
       i += 1.0
     if not location:
-      location = Location(file_path, 0, 0)
+      location = Location(self.file_path, 0, 0)
     return Table(location, fields)
   def binary_expr(self, args: tuple[Expr, Token, Expr]) -> BaseNode:
     left, op, right = args
@@ -212,9 +211,9 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
   pow_expr = binary_expr
   def unary_expr(self, args: tuple[Token, Expr]) -> BaseNode:
     op, expr = args
-    return UnaryExpr(get_loc(op), op.value, expr)
+    return UnaryExpr(get_loc(self.file_path, op), op.value, expr)
   def var(self, args: tuple[Token]) -> BaseNode:
-    return Var(get_loc(args[0]), args[0].value)
+    return Var(get_loc(self.file_path, args[0]), args[0].value)
   def union_type(self, args: tuple[MonoType, MonoType]) -> MonoType:
     return UnionType(args[0], args[1])
   def type_var(self, args: tuple[Token]) -> TypeVariable:
@@ -232,14 +231,14 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
       return NilType
     assert False
   def ELLIPSIS(self, token: Token) -> BaseNode:
-    return Vararg(get_loc(token))
+    return Vararg(get_loc(self.file_path, token))
   def NIL(self, token: Token) -> BaseNode:
-    return Nil(get_loc(token))
+    return Nil(get_loc(self.file_path, token))
   def BOOLEAN(self, token: Token) -> BaseNode:
-    return Boolean(get_loc(token), token.value == "true")
+    return Boolean(get_loc(self.file_path, token), token.value == "true")
   def STRING(self, token: Token) -> BaseNode:
-    return String(get_loc(token), token.value[1:-1])
+    return String(get_loc(self.file_path, token), token.value[1:-1])
   def NUMBER(self, token: Token) -> BaseNode:
-    return Number(get_loc(token), float(token.value))
+    return Number(get_loc(self.file_path, token), float(token.value))
 
 

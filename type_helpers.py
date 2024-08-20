@@ -233,8 +233,12 @@ def smart_union(type1: MonoType, type2: MonoType) -> MonoType:
     return type1
   if isinstance(type1, TypeConstructor) and isinstance(type2, TypeConstructor):
     if type1.name == type2.name:
-      if type1.value == type2.value and type1.value is not None and type2.value is not None:
-        return TypeConstructor(type1.name, [smart_union(a, b) for a, b in zip(type1.args, type2.args)], type1.value, type1.checks + type2.checks)
+      if type1.value is not None and type2.value is not None:
+        if type1.value == type2.value:
+          return TypeConstructor(type1.name, [smart_union(a, b) for a, b in zip(type1.args, type2.args)], type1.value, type1.checks + type2.checks)
+        else:
+          return UnionType(type1, type2)
+      return TypeConstructor(type1.name, [smart_union(a, b) for a, b in zip(type1.args, type2.args)], type1.value, type1.checks + type2.checks)
     return UnionType(type1, type2)
   if isinstance(type1, TableType) and isinstance(type2, TableType):
     fields: list[tuple[MonoType, MonoType]] = []

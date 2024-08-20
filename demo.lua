@@ -1,12 +1,7 @@
-
-function new_person(name, age)
-  if type(name) == "string" and type(age) == "number" then
-    return {
-      name = name,
-      age = age,
-    }
-  end
-  return nil
+local unknown = (function()
+  if true then return 1 else return "a" end
+end)()
+if type(unknown) == "number" then
+  return unknown
 end
-
---@reveal new_person
+return 0

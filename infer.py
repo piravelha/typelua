@@ -42,7 +42,8 @@ def set_path(prefix: Expr, value: MonoType, ctx: Context) -> UnifyError | None:
         if extends(path, k):
           cur_path = v
           break
-    assert isinstance(cur_path, TableType)
+    if not isinstance(cur_path, TableType):
+      return None
     new: list[tuple[MonoType, MonoType]] = []
     found = False
     for tup in cur_path.fields:
@@ -422,7 +423,9 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
     s.is_returning = True
     return s, TypeConstructor("tuple", exprs, None, [])
   elif isinstance(node, IfStmt):
-    res = infer(node.cond, ctx)
+    cond_ctx = Context(ctx.mapping.copy())
+    cond_ctx.recursive_fns = ctx.recursive_fns
+    res = infer(node.cond, cond_ctx)
     if isinstance(res, UnifyError): return res
     cond_s, cond_t = res
     bool_cond_s = unify(cond_t, BooleanType)
@@ -473,7 +476,7 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
       body_t = subs.apply_mono(smart_union(else_t, body_t))
     else:
       is_ret = False
-    s = body_s.apply_subst(cond_s)
+    s = body_s
     s.is_returning = is_ret
     return s, cond_s.apply_mono(body_t)
   elif isinstance(node, RevealAnnotation):

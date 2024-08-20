@@ -122,10 +122,10 @@ class UnionType:
   def __repr__(self) -> str:
     if isinstance(self.left, TypeConstructor) and self.left.name == "nil":
       right = f"{self.right}"
-      return f"({right})?" if " " in right else f"{right}?"
+      return f"({right})?" if " " in right and not right.startswith(("{", "\"")) else f"{right}?"
     if isinstance(self.right, TypeConstructor) and self.right.name == "nil":
       left = f"{self.left}"
-      return f"({left})?" if " " in left else f"{left}?"
+      return f"({left})?" if " " in left and not left.startswith(("{", "\"")) else f"{left}?"
     
     #return f"({self.left}) | ({self.right})"
     from type_helpers import unify
@@ -143,7 +143,7 @@ class UnionType:
           break
       else:
         filtered.append(type)
-    return " | ".join(f"({f})" if ((s := f"{f}") and " " in s and not s.startswith("{")) else f"{f}" for f in filtered)
+    return " | ".join(f"({f})" if ((s := f"{f}") and " " in s and not s.startswith(("{", "\""))) else f"{f}" for f in filtered)
 
 @dataclass
 class ForallType:
