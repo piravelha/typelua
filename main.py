@@ -15,7 +15,9 @@ def run(code: str) -> None:
   tree: Tree[Any] = parser.parse(code)
   ast = ToAST().transform(tree)
   res = infer(ast, Context({}))
-  print(res[1] if not isinstance(res, UnifyError) else f"{res.location}: {res.message}")
+  if isinstance(res, UnifyError):
+    print(f"{res.location}: {res.message}")
+  print(f"No issues found in {file_path}")
 
 if __name__ == "__main__":
   run(input)

@@ -156,6 +156,8 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
     return FuncAnnotation(Location(file_path, 0, 0), ret)
   def var_type_annotation(self, args: tuple[MonoType]) -> VarAnnotation:
     return VarAnnotation(Location(file_path, 0, 0), args[0])
+  def reveal_annotation(self, args: tuple[Expr]) -> RevealAnnotation:
+    return RevealAnnotation(args[0].location, args[0])
   def index_expr(self, args: tuple[Expr, Expr]) -> BaseNode:
     obj, index = args
     return IndexExpr(obj.location, obj, index)

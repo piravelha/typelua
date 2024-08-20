@@ -47,7 +47,9 @@ class TypeConstructor:
     if self.name == "function":
       params = ", ".join([str(a) for a in cast(TypeConstructor, self.args[0]).args] + (["..." + str(self.args[2])] if self.value else []))
       rets = ", ".join(f"{r}" for r in self.args[1].args) if isinstance(self.args[1], TypeConstructor) and self.args[1].name == "tuple" else repr(self.args[1])
-      return f"({params}) -> {rets}"
+      if len(cast(TypeConstructor, self.args[0]).args) != 1:
+        params = f"({params})"
+      return f"{params} -> {rets}"
     if self.name == "tuple":
       if len(self.args) == 1:
         return str(self.args[0])
@@ -153,3 +155,7 @@ class ForallType:
 @dataclass
 class Context:
   mapping: dict[str, PolyType]
+  recursive_fns: list[str]
+  def __init__(self, mapping: dict[str, PolyType]) -> None:
+    self.mapping = mapping
+    self.recursive_fns = []

@@ -15,6 +15,7 @@ chunk: stmt* [last_stmt]
      | func_assign
      | if_stmt
      | func_call
+     | reveal_annotation
 
 if_stmt: "if" expr "then" chunk elseif_stmts [else_stmt] "end"
 elseif_stmts: elseif_stmt*
@@ -38,6 +39,8 @@ assignables: assignable ("," assignable)*
 ?assignable: NAME
            | prop_expr
            | index_expr
+
+reveal_annotation: "--" "@reveal" expr
 
 var_type_annotation: "--" "@type" tuple_type
 var_decl: [var_type_annotation] "local" names "=" exprs

@@ -99,6 +99,10 @@ class VarAnnotation(BaseNode):
   types: 'MonoType'
 
 @dataclass
+class RevealAnnotation(BaseNode):
+  expr: Expr
+
+@dataclass
 class VarAssign(BaseNode):
   names: list[Expr]
   exprs: list[Expr]

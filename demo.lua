@@ -1,4 +1,12 @@
-function id(x)
-  return x
+
+function new_person(name, age)
+  if type(name) == "string" and type(age) == "number" then
+    return {
+      name = name,
+      age = age,
+    }
+  end
+  return nil
 end
-return id(1), id(true)
+
+--@reveal new_person

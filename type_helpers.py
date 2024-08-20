@@ -169,7 +169,7 @@ def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
         if extends(k1, k2):
           v = v2
           break
-      if v is None: return f"Field `{k2}` expected on type `{type1}`, but was not found"
+      if v is None: return f"Field `{k1}` expected on type `{type2}`, but was not found"
       v_res = unify(v, v1)
       if isinstance(v_res, str): return v_res
       s = v_res.apply_subst(s)
@@ -233,7 +233,8 @@ def smart_union(type1: MonoType, type2: MonoType) -> MonoType:
     return type1
   if isinstance(type1, TypeConstructor) and isinstance(type2, TypeConstructor):
     if type1.name == type2.name:
-      return TypeConstructor(type1.name, [smart_union(a, b) for a, b in zip(type1.args, type2.args)], type1.value, type1.checks + type2.checks)
+      if type1.value == type2.value and type1.value is not None and type2.value is not None:
+        return TypeConstructor(type1.name, [smart_union(a, b) for a, b in zip(type1.args, type2.args)], type1.value, type1.checks + type2.checks)
     return UnionType(type1, type2)
   if isinstance(type1, TableType) and isinstance(type2, TableType):
     fields: list[tuple[MonoType, MonoType]] = []

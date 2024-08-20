@@ -120,6 +120,8 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
     if node.name in global_ctx.mapping:
       val = instantiate(global_ctx.mapping[node.name])
       return Substitution({}), val
+    if node.name in ctx.recursive_fns:
+      return UnifyError(node.location, f"Unbound function name: `{node.name}`, did you mean to call it recursively? If so, try adding a return-type annotation")
     return UnifyError(node.location, f"Unbound identifier: `{node.name}`")
   elif isinstance(node, Nil):
     return Substitution({}), TypeConstructor("nil", [], None, [])
@@ -150,7 +152,16 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
       v_subst, v_type = v_res
       s = k_subst.apply_subst(s)
       s = v_subst.apply_subst(s)
-      types.append((k_type, v_type))
+      for i, (kt, vt) in enumerate(types):
+        if extends(k_type, kt):
+          res = unify(v_type, vt)
+          if isinstance(res, str):
+            types[i] = (kt, smart_union(v_type, vt))
+            break
+          types[i] = (kt, res.apply_mono(broaden(vt)))
+          break
+      else:
+        types.append((k_type, v_type))
     return s, TableType(types)
   elif isinstance(node, IndexExpr):
     res = infer(node.obj, ctx)
@@ -199,21 +210,21 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
     right_t = flatten_tuple(right_t)
     if node.op in ["+", "-", "*", "/", "%", "^"]:
       num_left_s = unify(left_t, NumberType)
-      if isinstance(num_left_s, str): return UnifyError(node.location, num_left_s)
+      if isinstance(num_left_s, str): return UnifyError(node.left.location, num_left_s)
       num_right_s = unify(right_t, NumberType)
-      if isinstance(num_right_s, str): return UnifyError(node.location, num_right_s)
+      if isinstance(num_right_s, str): return UnifyError(node.right.location, num_right_s)
       return num_left_s.apply_subst(num_right_s.apply_subst(left_s.apply_subst(right_s))), NumberType
     elif node.op in ["<", ">", "<=", ">="]:
       num_left_s = unify(left_t, NumberType)
-      if isinstance(num_left_s, str): return UnifyError(node.location, num_left_s)
+      if isinstance(num_left_s, str): return UnifyError(node.left.location, num_left_s)
       num_right_s = unify(right_t, NumberType)
-      if isinstance(num_right_s, str): return UnifyError(node.location, num_right_s)
+      if isinstance(num_right_s, str): return UnifyError(node.right.location, num_right_s)
       return num_left_s.apply_subst(num_right_s.apply_subst(left_s.apply_subst(right_s))), BooleanType
     elif node.op == "..":
       str_left_s = unify(left_t, StringType)
-      if isinstance(str_left_s, str): return UnifyError(node.location, str_left_s)
+      if isinstance(str_left_s, str): return UnifyError(node.left.location, str_left_s)
       str_right_s = unify(right_t, StringType)
-      if isinstance(str_right_s, str): return UnifyError(node.location, str_right_s)
+      if isinstance(str_right_s, str): return UnifyError(node.right.location, str_right_s)
       return str_left_s.apply_subst(str_right_s.apply_subst(left_s.apply_subst(right_s))), StringType
     elif node.op in ["==", "~="]:
       s = Substitution({})
@@ -244,20 +255,26 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
         if node.right.value == "nil":
           checks.append((node.left.args[0], NilType))
         if node.right.value == "table":
-          checks.append((node.left.args[0], TableType))
+          checks.append((node.left.args[0], TableType([])))
         if node.right.value == "function":
           checks.append((node.left.args[0], TypeConstructor("function", [new_type_var(), new_type_var(), new_type_var()], None, [])))
       return left_s.apply_subst(right_s.apply_subst(s)), TypeConstructor("boolean", [], None, checks)
     elif node.op in ["and", "or"]:
       bool_left_s = unify(left_t, BooleanType)
-      if isinstance(bool_left_s, str): return UnifyError(node.location, bool_left_s)
+      if isinstance(bool_left_s, str): return UnifyError(node.left.location, bool_left_s)
       bool_right_s = unify(right_t, BooleanType)
-      if isinstance(bool_right_s, str): return UnifyError(node.location, bool_right_s)
+      if isinstance(bool_right_s, str): return UnifyError(node.right.location, bool_right_s)
+      left_t = bool_left_s.apply_mono(left_t)
+      right_t = bool_right_s.apply_mono(right_t)
+      assert isinstance(left_t, TypeConstructor)
+      assert isinstance(right_t, TypeConstructor)
       return bool_left_s.apply_subst(bool_right_s.apply_subst(left_s.apply_subst(right_s))), TypeConstructor("boolean", [], None, left_t.checks + right_t.checks)
     assert False
   elif isinstance(node, FuncExpr):
     param_types: list[MonoType] = []
+    base_ctx = ctx
     ctx = Context(ctx.mapping.copy())
+    ctx.recursive_fns = base_ctx.recursive_fns
     for param in node.params:
       new_var = new_type_var()
       ctx.mapping[param] = new_var
@@ -329,6 +346,9 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
   elif isinstance(node, VarDecl):
     exprs: list[MonoType] = []
     s = Substitution({})
+    for name in node.names:
+      if isinstance(name, Var):
+        ctx.recursive_fns.append(name.name)
     for expr in node.exprs:
       res = infer(expr, ctx)
       if isinstance(res, UnifyError): return res
@@ -351,6 +371,9 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
   elif isinstance(node, VarAssign):
     exprs = []
     s = Substitution({})
+    for name in node.names:
+      if isinstance(name, Var):
+        ctx.recursive_fns.append(name.name)
     for expr in node.exprs:
       res = infer(expr, ctx)
       if isinstance(res, UnifyError): return res
@@ -405,6 +428,7 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
     bool_cond_s = unify(cond_t, BooleanType)
     base_ctx = ctx
     ctx = Context(ctx.mapping.copy())
+    ctx.recursive_fns = base_ctx.recursive_fns
     if isinstance(bool_cond_s, str): return UnifyError(node.location, bool_cond_s)
     if isinstance(cond_t, TypeConstructor):
       for prefix1, expr1 in cond_t.checks:
@@ -424,7 +448,9 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
     body_s, body_t = res
     is_ret = body_s.is_returning
     if node.else_stmt:
+      base_ctx = ctx
       ctx = Context(base_ctx.mapping.copy())
+      ctx.recursive_fns = base_ctx.recursive_fns
       if isinstance(cond_t, TypeConstructor):
         for prefix1, expr1 in cond_t.checks:
           res = infer(prefix1, ctx)
@@ -450,8 +476,16 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
     s = body_s.apply_subst(cond_s)
     s.is_returning = is_ret
     return s, cond_s.apply_mono(body_t)
+  elif isinstance(node, RevealAnnotation):
+    res = infer(node.expr, ctx)
+    if isinstance(res, UnifyError): return res
+    expr_s, expr_t = res
+    print(f"{node.location} (@reveal): {expr_t}")
+    return Substitution({}), NilType
   elif isinstance(node, Chunk):
+    base_ctx = ctx
     ctx = Context(ctx.mapping.copy())
+    ctx.recursive_fns = base_ctx.recursive_fns
     ret: MonoType | None = None
     s = Substitution({})
     has_returned = False
