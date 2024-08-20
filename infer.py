@@ -395,6 +395,7 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
     if isinstance(res, UnifyError): return res
     cond_s, cond_t = res
     bool_cond_s = unify(cond_t, BooleanType)
+    base_ctx = ctx
     ctx = Context(ctx.mapping.copy())
     if isinstance(bool_cond_s, str): return UnifyError(node.location, bool_cond_s)
     if isinstance(cond_t, TypeConstructor):
@@ -413,24 +414,45 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
     res = infer(node.body, ctx)
     if isinstance(res, UnifyError): return res
     body_s, body_t = res
+    is_ret = body_s.is_returning
     if node.else_stmt:
+      ctx = Context(base_ctx.mapping.copy())
+      if isinstance(cond_t, TypeConstructor):
+        for prefix1, expr1 in cond_t.checks:
+          res = infer(prefix1, ctx)
+          if isinstance(res, UnifyError): return res
+          prefix_s, prefix_t = res
+          val1 = subtract(prefix_t, expr1)
+          if isinstance(prefix1, Var):
+            ctx.mapping[prefix1.name] = val1
+          else:
+            err = set_path(prefix1, val1, ctx)
+            if err: return err
       res = infer(node.else_stmt, ctx)
       if isinstance(res, UnifyError): return res
       else_s, else_t = res
+      if is_ret and not else_s.is_returning:
+        is_ret = False
       body_s = else_s.apply_subst(body_s)
       subs = unify(else_t, broaden(body_t))
       if isinstance(subs, str): subs = Substitution({})
       body_t = subs.apply_mono(smart_union(else_t, body_t))
-    return body_s.apply_subst(cond_s), cond_s.apply_mono(body_t)
+    else:
+      is_ret = False
+    s = body_s.apply_subst(cond_s)
+    s.is_returning = is_ret
+    return s, cond_s.apply_mono(body_t)
   elif isinstance(node, Chunk):
     ctx = Context(ctx.mapping.copy())
     ret: MonoType | None = None
     s = Substitution({})
+    has_returned = False
     for stmt in node.stmts:
       res = infer(stmt, ctx)
       if isinstance(res, UnifyError): return res
       stmt_s, stmt_t = res
-      if isinstance(stmt_t, TypeConstructor) and stmt_t.name == "tuple" and not isinstance(stmt, FuncCall) and stmt_s.is_returning:
+      if isinstance(stmt_t, TypeConstructor) and stmt_t.name == "tuple" and not isinstance(stmt, FuncCall):
+        if stmt_s.is_returning: has_returned = True
         if ret is None:
           ret = stmt_t
         #else:
@@ -469,6 +491,11 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
             ret.args[i] = smart_union(ret.args[i], arg1)
         s = ret_s.apply_subst(s)
       s = stmt_s.apply_subst(s)
+    elif ret and not has_returned:
+      new_ret = TypeConstructor("tuple", [], None, [])
+      for arg in ret.args:
+        new_ret.args.append(UnionType(arg, NilType))
+      ret = new_ret
     s.is_returning = True
     if ret is None:
       s.is_returning = False

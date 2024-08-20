@@ -84,6 +84,15 @@ def intersect(type1: MonoType, type2: MonoType) -> 'Optional[MonoType]':
     return TypeConstructor(type1.name, args, type1.value, type1.checks + type2.checks)
   return None
 
+def subtract(type1: MonoType, type2: MonoType) -> MonoType:
+  if isinstance(type1, UnionType):
+    if not isinstance(unify(type1.left, type2), str):
+      return subtract(type1.right, type2)
+    if not isinstance(unify(type1.right, type2), str):
+      return subtract(type1.left, type2)
+    return UnionType(subtract(type1.left, type2), subtract(type1.right, type2))
+  return type1
+
 def instantiate(type: PolyType, mappings: dict[str, TypeVariable] = {}) -> MonoType:
   if isinstance(type, TypeVariable):
     if type.name in mappings:
