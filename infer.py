@@ -295,13 +295,14 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
     res = infer(node.func, ctx)
     if isinstance(res, UnifyError): return res
     node_func_s, node_func_t = res
+    node_func_t = flatten_tuple(node_func_t)
     varargs: MonoType | None = None
     # TODO find a better way to do this
     if isinstance(node_func_t, TypeVariable):
       func_type = TypeConstructor("function", [TypeConstructor("tuple", [broaden(p) for p in params1], None, []), beta, NilType], None, [])
       subs = unify(func_type, node_func_t)
       if isinstance(subs, str): return UnifyError(node.location, subs)
-      return subs.apply_subst(args_s), beta
+      return subs.apply_subst(node_func_s.apply_subst(args_s)), subs.apply_subst(node_func_s).apply_mono(beta)
     assert isinstance(node_func_t, TypeConstructor)
     if node_func_t.value == True:
       assert isinstance(node_func_t.args[0], TypeConstructor)
@@ -322,7 +323,6 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
       assert isinstance(node_func_t.args[2], TypeVariable)
       replace_s = Substitution({node_func_t.args[2].name: varargs}).apply_subst(replace_s)
     if isinstance(replace_s, str): return UnifyError(node.location, replace_s)
-    # TODO: Stop reyling on applying substitutions multiple times
     final_subs = replace_s.apply_subst(func_s.apply_subst(node_func_s.apply_subst(args_s)))
     return final_subs, final_subs.apply_mono(beta)
   elif isinstance(node, VarDecl):
@@ -387,7 +387,7 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
           exprs.extend([t[1] for t in expr_t.fields])
         else:
           exprs.append(expr_t)
-      s = expr_s.apply_subst_unsafe(s)
+      s = expr_s.apply_subst(s)
     s.is_returning = True
     return s, TypeConstructor("tuple", exprs, None, [])
   elif isinstance(node, IfStmt):

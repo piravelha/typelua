@@ -39,7 +39,6 @@ class Substitution:
       if new.get(n):
         res = intersect(t, new[n])
         if not res:
-          print(n, t, new[n])
           res = t
         new[n] = res
       else:
@@ -138,6 +137,12 @@ def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
     return Substitution({type2.name: type1})
   if isinstance(type1, TypeVariable):
     return Substitution({type1.name: type2})
+  if isinstance(type1, UnionType):
+    left_s = unify(type1.left, type2)
+    if isinstance(left_s, str): return left_s
+    right_s = unify(type1.right, type2)
+    if isinstance(right_s, str): return right_s
+    return left_s.apply_subst(right_s)
   if isinstance(type2, UnionType):
     s = Substitution({})
     left_s = unify(type1, type2.left)
@@ -148,12 +153,6 @@ def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
       s = right_s.apply_subst(s)
     if isinstance(left_s, str) and isinstance(right_s, str): return left_s
     return s
-  if isinstance(type1, UnionType):
-    left_s = unify(type1.left, type2)
-    if isinstance(left_s, str): return left_s
-    right_s = unify(type1.right, type2)
-    if isinstance(right_s, str): return right_s
-    return left_s.apply_subst(right_s)
   if isinstance(type1, TableType) and isinstance(type2, TableType):
     s = Substitution({})
     for (k1, v1) in type1.fields:
@@ -179,7 +178,6 @@ def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
   #     s = res.apply_subst(res)
   #   return s
   if len(type1.args) != len(type2.args):
-    assert False
     return f"Types dont unify: Expected '{type1}', but got '{type2}'" 
   if type1.value is not None and type2.value is not None:
     if type1.value != type2.value:
@@ -192,6 +190,10 @@ def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
       res = unify(p2, p1)
       if isinstance(res, str): return res
       s = res.apply_subst(s)
+    if not isinstance(type1.args[1], (TypeConstructor, TypeVariable)) or type1.args[1].name != "tuple" and not isinstance(type1.args[1], TypeVariable):
+      type1.args[1] = TypeConstructor("tuple", [type1.args[1]], None, [])
+    if not isinstance(type2.args[1], (TypeConstructor, TypeVariable)) or type2.args[1].name != "tuple" and not isinstance(type1.args[1], TypeVariable):
+      type2.args[1] = TypeConstructor("tuple", [type2.args[1]], None, [])
     res = unify(type1.args[1], type2.args[1])
     if isinstance(res, str): return res
     return res.apply_subst(s)

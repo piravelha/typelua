@@ -1,16 +1,10 @@
 
-local unknown = (function()
+function get_num()
   if true then
-    return 1
+    return ""
   else
-    return "a"
+    return 1
   end
-end)()
-
-if type(unknown) == "number" then
-  return unknown + 1
-else
-  return unknown .. "!"
 end
 
-
+return get_num()

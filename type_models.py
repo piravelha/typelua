@@ -14,10 +14,19 @@ PolyType: TypeAlias = """
   | ForallType
 """
 
+variable_names_rendered = {}
+
 @dataclass
 class TypeVariable:
   name: str
   def __repr__(self) -> str:
+    global variable_names_rendered
+    if self.name in variable_names_rendered:
+      return variable_names_rendered[self.name]
+    letters = "abcdefghijklmnopqrstuvwyxz"
+    if (i := len(variable_names_rendered)) < len(letters):
+      variable_names_rendered[self.name] = letters[i]
+      return letters[i]
     return self.name
 
 @dataclass
@@ -38,7 +47,7 @@ class TypeConstructor:
     if self.name == "function":
       vararg: list[str] = ["..."] if self.value else []
       params = ", ".join([str(a) for a in cast(TypeConstructor, self.args[0]).args] + vararg)
-      rets = ", ".join(f"({r})" if " " in f"{r}" else f"{r}" for r in self.args[1].args) if isinstance(self.args[1], TypeConstructor) else repr(self.args[1])
+      rets = ", ".join(f"{r}" for r in self.args[1].args) if isinstance(self.args[1], TypeConstructor) and self.args[1].name == "tuple" else repr(self.args[1])
       return f"({params}) -> {rets}"
     if self.name == "tuple":
       if len(self.args) == 1:
