@@ -170,6 +170,7 @@ def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
   #     s = res.apply_subst(res)
   #   return s
   if len(type1.args) != len(type2.args):
+    assert False
     return f"Types dont unify: Expected '{type1}', but got '{type2}'" 
   if type1.value is not None and type2.value is not None:
     if type1.value != type2.value:

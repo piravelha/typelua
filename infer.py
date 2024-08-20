@@ -419,8 +419,8 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
       else_s, else_t = res
       body_s = else_s.apply_subst(body_s)
       subs = unify(else_t, broaden(body_t))
-      if isinstance(subs, str): return UnifyError(node.location, subs)
-      body_t = subs.apply_mono(broaden(else_t))
+      if isinstance(subs, str): subs = Substitution({})
+      body_t = subs.apply_mono(smart_union(else_t, body_t))
     return body_s.apply_subst(cond_s), cond_s.apply_mono(body_t)
   elif isinstance(node, Chunk):
     ctx = Context(ctx.mapping.copy())
@@ -446,7 +446,7 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
             ret.args.append(UnionType(arg1, NilType))
           else:
             ret.args[i] = smart_union(ret.args[i], arg1)
-        ret = ret_s.apply_mono(broaden(ret))
+        ret = ret_s.apply_mono(ret)
       s = stmt_s.apply_subst(s)
     if node.last:
       res = infer(node.last, ctx)
@@ -469,11 +469,6 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
             ret.args[i] = smart_union(ret.args[i], arg1)
         s = ret_s.apply_subst(s)
       s = stmt_s.apply_subst(s)
-    elif ret:
-      ret_s = unify(TypeConstructor("tuple", [], None, []), ret)
-      if isinstance(ret_s, str): return UnifyError(node.location, ret_s)
-      ret = ret_s.apply_mono(ret)
-
     s.is_returning = True
     if ret is None:
       s.is_returning = False

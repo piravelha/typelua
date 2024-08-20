@@ -7,6 +7,19 @@ def test_basic_if() -> None:
       if true then
         local result = "hello"
         result = "world"
+        return result
       end
       return result
-    """) == "0"
+    """) == "string | 0"
+
+def test_type_refinement() -> None:
+  assert run_test(
+    """
+      local unknown = (function()
+        if true then return 1 else return "a" end
+      end)()
+      if type(unknown) == "number" then
+        return unknown
+      end
+      return 0
+    """) == "number"
