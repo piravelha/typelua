@@ -18,7 +18,7 @@ class Substitution:
         return self.apply_mono(self.mapping[m.name])
       return m
     elif isinstance(m, TypeConstructor):
-      return TypeConstructor(m.name, [self.apply_mono(a) for a in m.args], m.value)
+      return TypeConstructor(m.name, [self.apply_mono(a) for a in m.args], m.value, m.checks)
     elif isinstance(m, TableType):
       return TableType([(a, self.apply_mono(b)) for a, b in m.fields])
     elif isinstance(m, UnionType):
@@ -38,7 +38,9 @@ class Substitution:
     for n, t in s.mapping.items():
       if new.get(n):
         res = intersect(t, new[n])
-        if res is None: assert False
+        if not res:
+          print(n, t, new[n])
+          res = t
         new[n] = res
       else:
         new[n] = self.apply_mono(t)
@@ -61,10 +63,7 @@ def intersect(type1: MonoType, type2: MonoType) -> 'Optional[MonoType]':
   if isinstance(type2, TypeVariable):
     return type1
   if isinstance(type2, UnionType):
-    print(type1, type2, unify(type1, type2.left))
-    if not isinstance(unify(type1, type2.left), str):
-      return intersect(type1, type2.left)
-    return intersect(type1, type2.right)
+    return intersect(type1, type2.left) or intersect(type1, type2.right)
   if isinstance(type1, UnionType):
     return intersect(type2, type1)
   if isinstance(type1, TableType) and isinstance(type2, TableType):
@@ -80,9 +79,9 @@ def intersect(type1: MonoType, type2: MonoType) -> 'Optional[MonoType]':
     args = []
     for a, b in zip(type1.args, type2.args):
       val = intersect(a, b)
-      assert val is not None
+      if not val: return None
       args.append(val)
-    return TypeConstructor(type1.name, args, type1.value)
+    return TypeConstructor(type1.name, args, type1.value, type1.checks + type2.checks)
   return None
 
 def instantiate(type: PolyType, mappings: dict[str, TypeVariable] = {}) -> MonoType:
@@ -91,7 +90,7 @@ def instantiate(type: PolyType, mappings: dict[str, TypeVariable] = {}) -> MonoT
       return mappings[type.name]
     return type
   elif isinstance(type, TypeConstructor):
-    return TypeConstructor(type.name, [instantiate(a, mappings) for a in type.args], type.value)
+    return TypeConstructor(type.name, [instantiate(a, mappings) for a in type.args], type.value, type.checks)
   elif isinstance(type, TableType):
     return TableType([(instantiate(k, mappings), instantiate(v, mappings)) for k, v in type.fields])
   elif isinstance(type, UnionType):
@@ -187,6 +186,8 @@ def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
     if isinstance(res, str): return res
     return res.apply_subst(s)
   if type2.value is not None and type1.value is None:
+    if type2.value == True:
+      assert False
     return f"Type '{type1}' does not extend type '{type2}'"
   s = Substitution({})
   for a, b in zip(type1.args, type2.args):
@@ -197,7 +198,7 @@ def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
 
 def broaden(type: MonoType) -> MonoType:
   if isinstance(type, TypeConstructor):
-    return TypeConstructor(type.name, [broaden(a) for a in type.args], None)
+    return TypeConstructor(type.name, [broaden(a) for a in type.args], None, type.checks)
   if isinstance(type, UnionType):
     return UnionType(broaden(type.left), broaden(type.right))
   return type
@@ -212,7 +213,7 @@ def smart_union(type1: MonoType, type2: MonoType) -> MonoType:
     return type1
   if isinstance(type1, TypeConstructor) and isinstance(type2, TypeConstructor):
     if type1.name == type2.name:
-      return TypeConstructor(type1.name, [smart_union(a, b) for a, b in zip(type1.args, type2.args)], type1.value)
+      return TypeConstructor(type1.name, [smart_union(a, b) for a, b in zip(type1.args, type2.args)], type1.value, type1.checks + type2.checks)
     return UnionType(type1, type2)
   if isinstance(type1, TableType) and isinstance(type2, TableType):
     fields: list[tuple[MonoType, MonoType]] = []

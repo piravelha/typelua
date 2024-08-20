@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Literal, TypeAlias, Any, cast
+from models import Expr
 
 MonoType: TypeAlias = """
   TypeVariable
@@ -24,6 +25,7 @@ class TypeConstructor:
   name: str
   args: list[MonoType]
   value: Any
+  checks: list[tuple[Expr, MonoType]]
   def __repr__(self) -> str:
     if self.name == "string" and self.value is not None:
       return "\"" + str(self.value) + "\""
@@ -47,10 +49,10 @@ class TypeConstructor:
       return f"{self.name}<{args}>"
     return self.name
 
-NumberType = TypeConstructor("number", [], None)
-StringType = TypeConstructor("string", [], None)
-BooleanType = TypeConstructor("boolean", [], None)
-NilType = TypeConstructor("nil", [], None)
+NumberType = TypeConstructor("number", [], None, [])
+StringType = TypeConstructor("string", [], None, [])
+BooleanType = TypeConstructor("boolean", [], None, [])
+NilType = TypeConstructor("nil", [], None, [])
 
 def array_repr(table: 'TableType') -> str | Literal[False]:
   from type_helpers import unify, broaden

@@ -214,7 +214,7 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
   def union_type(self, args: tuple[MonoType, MonoType]) -> MonoType:
     return UnionType(args[0], args[1])
   def tuple_type(self, args: list[MonoType]) -> MonoType:
-    return TypeConstructor("tuple", args, None)
+    return TypeConstructor("tuple", args, None, [])
   def PRIMITIVE_TYPE(self, token: Token) -> MonoType:
     if token.value == "number":
       return NumberType

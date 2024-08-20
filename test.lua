@@ -7,6 +7,8 @@ end
 
 local res = union()
 
+if type(res.z) == "nil" and type(res.x) == "string" then
+  return res.z, res.x
+end
 
-
-return res.z
+return nil, 123
