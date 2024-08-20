@@ -22,12 +22,12 @@ class TypeVariable:
   def __repr__(self) -> str:
     global variable_names_rendered
     if self.name in variable_names_rendered:
-      return variable_names_rendered[self.name]
+      return "'" + variable_names_rendered[self.name]
     letters = "abcdefghijklmnopqrstuvwyxz"
     if (i := len(variable_names_rendered)) < len(letters):
       variable_names_rendered[self.name] = letters[i]
-      return letters[i]
-    return self.name
+      return "'" + letters[i]
+    return "'" + self.name
 
 @dataclass
 class TypeConstructor:

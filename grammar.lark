@@ -2,7 +2,9 @@
 ?start: chunk
 
 ?type: PRIMITIVE_TYPE
+     | type_var
      | type "|" type -> union_type
+type_var: /'[a-zA-Z_]\w*\b/
 tuple_type: type ("," type)*
 
 chunk: stmt* [last_stmt]
@@ -38,7 +40,7 @@ assignables: assignable ("," assignable)*
            | index_expr
 
 var_type_annotation: "--" "@type" tuple_type
-var_decl: "local" names "=" exprs
+var_decl: [var_type_annotation] "local" names "=" exprs
 
 exprs: expr ("," expr)*
 names: NAME ("," NAME)*

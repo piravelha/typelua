@@ -122,7 +122,7 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
       is_vararg = params.children[0] is not None
     if not loc:
       loc = Location(file_path, 0, 0)
-    return VarDecl(get_loc(name), [name.value], [FuncExpr(loc, param_strs, is_vararg, body, name.value, annotation)])
+    return VarDecl(get_loc(name), [name.value], [FuncExpr(loc, param_strs, is_vararg, body, name.value, annotation)], None)
   def var_assign(self, args: tuple[Tree[Any], Tree[Any]]) -> BaseNode:
     names, exprs = args
     name_strs: list[Expr] = []
@@ -136,8 +136,8 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
       assert is_expr(expr)
       expr_exprs.append(expr)
     return VarAssign(expr_exprs[0].location, name_strs, expr_exprs)
-  def var_decl(self, args: tuple[Tree[Any], Tree[Any]]) -> BaseNode:
-    names, exprs = args
+  def var_decl(self, args: tuple[Optional[VarAnnotation], Tree[Any], Tree[Any]]) -> BaseNode:
+    annotation, names, exprs = args
     name_strs: list[str] = []
     expr_exprs: list[Expr] = []
     for name in names.children:
@@ -147,13 +147,15 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
     for expr in exprs.children:
       assert is_expr(expr)
       expr_exprs.append(expr)
-    return VarDecl(expr_exprs[0].location, name_strs, expr_exprs)
+    return VarDecl(expr_exprs[0].location, name_strs, expr_exprs, annotation)
   def func_annotations(self, args: list[Tree[Any]]) -> FuncAnnotation:
     ret = None
     for arg in args:
       if arg.data == "return_type_annotation":
         ret = cast(MonoType, arg.children[0])
     return FuncAnnotation(Location(file_path, 0, 0), ret)
+  def var_type_annotation(self, args: tuple[MonoType]) -> VarAnnotation:
+    return VarAnnotation(Location(file_path, 0, 0), args[0])
   def index_expr(self, args: tuple[Expr, Expr]) -> BaseNode:
     obj, index = args
     return IndexExpr(obj.location, obj, index)
@@ -213,6 +215,8 @@ class ToAST(Transformer[Tree[Any], BaseNode]):
     return Var(get_loc(args[0]), args[0].value)
   def union_type(self, args: tuple[MonoType, MonoType]) -> MonoType:
     return UnionType(args[0], args[1])
+  def type_var(self, args: tuple[Token]) -> TypeVariable:
+    return TypeVariable(args[0].value)
   def tuple_type(self, args: list[MonoType]) -> MonoType:
     return TypeConstructor("tuple", args, None, [])
   def PRIMITIVE_TYPE(self, token: Token) -> MonoType:

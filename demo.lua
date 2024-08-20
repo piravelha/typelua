@@ -1,4 +1,9 @@
 
--- @type {x: 'a}
-local test = {x = 10}
+-- @type 'a
+local test = 10
 
+function f(x)
+  return x + 1
+end
+
+return test

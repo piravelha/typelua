@@ -38,7 +38,7 @@ def set_path(prefix: Expr, value: MonoType, ctx: Context) -> UnifyError | None:
     for path in paths[:-1]:
       assert isinstance(cur_path, TableType)
       for k, v in cur_path.fields:
-        if not isinstance(unify(path, k), str):
+        if extends(path, k):
           cur_path = v
           break
     assert isinstance(cur_path, TableType)
@@ -46,7 +46,7 @@ def set_path(prefix: Expr, value: MonoType, ctx: Context) -> UnifyError | None:
     found = False
     for tup in cur_path.fields:
       k, v = tup
-      if not isinstance(unify(paths[-1], k), str):
+      if extends(paths[-1], k):
         subs = unify(value, broaden(v))
         if isinstance(subs, str): return UnifyError(prefix.location, subs)
         new.append((k, subs.apply_mono(broaden(value))))
@@ -92,7 +92,7 @@ def infer_type_check_predicate(node: IfStmt, ctx: Context) -> Optional[UnifyErro
             else:
               assert False, f"Not implemented: {contents}"
             res1 = intersect(arg_t, type)
-            if res1 is None: return UnifyError(node.location, f"Attempting to narrow down type '{arg_t}' to '{type}' will result in a 'never' type")
+            if res1 is None: return UnifyError(node.location, f"Attempting to narrow down type `{arg_t}` to `{type}` will result in a `never` type")
             ctx.mapping[arg.name] = res1
             return None
       if isinstance(left, Var):
@@ -105,7 +105,7 @@ def infer_type_check_predicate(node: IfStmt, ctx: Context) -> Optional[UnifyErro
         var_s, var_t = res
         var_t = broaden(var_t)
         res2 = intersect(var_t, expr_t)
-        if res2 is None: return UnifyError(node.location, f"Attempting to compare two distinct types: '{var_t}' and '{expr_t}'")
+        if res2 is None: return UnifyError(node.location, f"Attempting to compare two distinct types: `{var_t}` and `{expr_t}`")
         ctx.mapping[left.name] = res2
         return None
   return None
@@ -119,7 +119,7 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
     if node.name in global_ctx.mapping:
       val = instantiate(global_ctx.mapping[node.name])
       return Substitution({}), val
-    return UnifyError(node.location, f"Unbound identifier: '{node.name}'")
+    return UnifyError(node.location, f"Unbound identifier: `{node.name}`")
   elif isinstance(node, Nil):
     return Substitution({}), TypeConstructor("nil", [], None, [])
   elif isinstance(node, Number):
@@ -338,7 +338,14 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
         exprs.append(expr_t)
       s = expr_s.apply_subst(s)
     for i, name in enumerate(node.names):
-      ctx.mapping[name] = ForallType(name, exprs[i])
+      if node.annotation:
+        anno = node.annotation.types
+        assert isinstance(anno, TypeConstructor) and anno.name == "tuple"
+        if not extends(exprs[i], anno.args[i]):
+          return UnifyError(node.location, f"Type mismatch between annotation `{anno.args[i]}` and `{name}`, expected `{anno.args[i]}`, got `{exprs[i]}`")
+        ctx.mapping[name] = generalize(anno, ctx)
+      else:
+        ctx.mapping[name] = generalize(exprs[i], ctx)
     return s, NilType
   elif isinstance(node, VarAssign):
     exprs = []
@@ -405,7 +412,7 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
         prefix_s, prefix_t = res
         val1 = intersect(prefix_t, expr1)
         if val1 is None:
-          return UnifyError(node.location, f"Attempting to narrow type '{prefix_t}' into '{expr1}' results in a 'never' type")
+          return UnifyError(node.location, f"Attempting to narrow type `{prefix_t}` into `{expr1}`` results in a `never` type")
         if isinstance(prefix1, Var):
           ctx.mapping[prefix1.name] = val1
         else:

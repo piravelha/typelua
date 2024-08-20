@@ -71,7 +71,7 @@ def intersect(type1: MonoType, type2: MonoType) -> 'Optional[MonoType]':
     filtered = []
     for k, v in fields:
       for fk, fv in filtered:
-        if not isinstance(unify(k, fk), str):
+        if extends(k, fk):
           break
       else:
         filtered.append((k, v))
@@ -93,9 +93,9 @@ def intersect(type1: MonoType, type2: MonoType) -> 'Optional[MonoType]':
 
 def subtract(type1: MonoType, type2: MonoType) -> MonoType:
   if isinstance(type1, UnionType):
-    if not isinstance(unify(type1.left, type2), str):
+    if extends(type1.left, type2):
       return subtract(type1.right, type2)
-    if not isinstance(unify(type1.right, type2), str):
+    if extends(type1.right, type2):
       return subtract(type1.left, type2)
     return UnionType(subtract(type1.left, type2), subtract(type1.right, type2))
   return type1
@@ -166,18 +166,18 @@ def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
     for (k2, v2) in type2.fields:
       v: 'MonoType | None' = None
       for k1, v1 in type1.fields:
-        if not isinstance(unify(k2, k1), str):
+        if extends(k2, k1):
           v = v1
           break
-      if v is None: return f"Field '{k2}' expected on type '{type1}', but was not found"
+      if v is None: return f"Field `{k2}` expected on type `{type1}`, but was not found"
       v_res = unify(v, v2)
       if isinstance(v_res, str): return v_res
       s = v_res.apply_subst(s)
     return s
   if not isinstance(type1, TypeConstructor) or not isinstance(type2, TypeConstructor):
-    return f"Types dont unify: '{type1}' and '{type2}'"
+    return f"Types dont unify: `{type1}` and `{type2}`"
   if type1.name != type2.name:
-    return f"Types dont unify: Expected '{type2.name}', got '{type1.name}'"
+    return f"Types dont unify: Expected `{type2.name}`, got `{type1.name}`"
   # if type1.name == "tuple" and type2.name == "tuple":
   #   s = Substitution({})
   #   for a, b in zip(type1.args, type2.args):
@@ -186,10 +186,10 @@ def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
   #     s = res.apply_subst(res)
   #   return s
   if len(type1.args) != len(type2.args):
-    return f"Types dont unify: Expected '{type1}', but got '{type2}'" 
+    return f"Types dont unify: Expected `{type1}`, but got `{type2}`" 
   if type1.value is not None and type2.value is not None:
     if type1.value != type2.value:
-      return f"Type '{type1}' does not extend type '{type2}'" 
+      return f"Type `{type1}` does not extend type `{type2}`" 
   if type1.name == "function":
     s = Substitution({})
     assert isinstance(type1.args[0], TypeConstructor)
@@ -208,7 +208,7 @@ def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
   if type2.value is not None and type1.value is None:
     if type2.value == True:
       assert False
-    return f"Type '{type1}' does not extend type '{type2}'"
+    return f"Type `{type1}` does not extend type `{type2}`"
   s = Substitution({})
   for a, b in zip(type1.args, type2.args):
     res = unify(a, b)
@@ -240,10 +240,10 @@ def smart_union(type1: MonoType, type2: MonoType) -> MonoType:
     for k1, v1 in type1.fields:
       val = None
       for k2, v2 in type2.fields:
-        if not isinstance(unify(k1, k2), str):
+        if extends(k1, k2):
           val = v2
       for fk, fv in fields:
-        if not isinstance(unify(k1, fk), str):
+        if extends(k1, fk):
           break
       else:
         if not val:
@@ -253,10 +253,10 @@ def smart_union(type1: MonoType, type2: MonoType) -> MonoType:
     for k1, v1 in type2.fields:
       val = None
       for k2, v2 in type1.fields:
-        if not isinstance(unify(k1, k2), str):
+        if extends(k1, k2):
           val = v2
       for fk, fv in fields:
-        if not isinstance(unify(k1, fk), str):
+        if extends(k1, fk):
           break
       else:
         if not val:
@@ -265,3 +265,10 @@ def smart_union(type1: MonoType, type2: MonoType) -> MonoType:
           fields.append((k1, smart_union(v1, val)))
     return TableType(fields)
   return UnionType(type1, type2)
+
+def extends(type1, type2):
+  if isinstance(type1, TypeVariable):
+    return isinstance(type2, TypeVariable) and type1.name == type2.name
+  if isinstance(type2, TypeVariable):
+    return isinstance(type1, TypeVariable) and type2.name == type1.name
+  return not isinstance(unify(type1, type2), str)

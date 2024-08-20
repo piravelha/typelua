@@ -92,6 +92,11 @@ class IndexExpr(BaseNode):
 class VarDecl(BaseNode):
   names: list[str]
   exprs: list[Expr]
+  annotation: 'Optional[VarAnnotation]'
+
+@dataclass
+class VarAnnotation(BaseNode):
+  types: 'MonoType'
 
 @dataclass
 class VarAssign(BaseNode):
