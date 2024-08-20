@@ -1,9 +1,4 @@
-
--- @type 'a
-local test = 10
-
-function f(x)
-  return x + 1
+function id(x)
+  return x
 end
-
-return test
+return id(1), id(true)

@@ -101,11 +101,6 @@ class TableType:
       else:
         s += f"[{k}]: {v}"
     s += "}"
-    max_repr = 100
-    if len(s) > max_repr:
-      left = s[:int(max_repr/2)]
-      right = s[-int(max_repr/2):]
-      return left + "....." + right
     return s
 
 typeof = type

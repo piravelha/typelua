@@ -163,14 +163,14 @@ def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
     return s
   if isinstance(type1, TableType) and isinstance(type2, TableType):
     s = Substitution({})
-    for (k2, v2) in type2.fields:
+    for (k1, v1) in type1.fields:
       v: 'MonoType | None' = None
-      for k1, v1 in type1.fields:
-        if extends(k2, k1):
-          v = v1
+      for k2, v2 in type2.fields:
+        if extends(k1, k2):
+          v = v2
           break
       if v is None: return f"Field `{k2}` expected on type `{type1}`, but was not found"
-      v_res = unify(v, v2)
+      v_res = unify(v, v1)
       if isinstance(v_res, str): return v_res
       s = v_res.apply_subst(s)
     return s
@@ -206,7 +206,7 @@ def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
     if isinstance(res, str): return res
     return res.apply_subst(s)
   if type2.value is not None and type1.value is None:
-    if type2.value == True:
+    if type2.value is True:
       assert False
     return f"Type `{type1}` does not extend type `{type2}`"
   s = Substitution({})

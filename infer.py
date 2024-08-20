@@ -20,7 +20,8 @@ def set_path(prefix: Expr, value: MonoType, ctx: Context) -> UnifyError | None:
       res = ctx.mapping[expr.name]
       if isinstance(res, ForallType):
         res_t = res.body
-      else: assert False
+      else:
+        res_t = res
       assert not isinstance(res_t, ForallType)
       return res_t, []
     elif isinstance(expr, IndexExpr):
@@ -369,10 +370,10 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
         existing = instantiate(ctx.mapping[prefix.name])
         subs = unify(exprs[i], broaden(existing))
         if isinstance(subs, str): return UnifyError(node.location, subs)
-        ctx.mapping[prefix.name] = subs.apply_mono(exprs[i])
+        ctx.mapping[prefix.name] = generalize(subs.apply_mono(exprs[i]), ctx)
       else:
-        ctx.mapping[prefix.name] = exprs[i]
-        global_ctx.mapping[prefix.name] = exprs[i]
+        ctx.mapping[prefix.name] = generalize(exprs[i], ctx)
+        global_ctx.mapping[prefix.name] = generalize(exprs[i], ctx)
     return s, NilType
   elif isinstance(node, ReturnStmt):
     exprs = []
