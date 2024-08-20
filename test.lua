@@ -1,12 +1,12 @@
 function union()
-  -- @return string | number
-  return "str"
+  if true then
+    return {x = 0, z = true}
+  end
+  return {x = "", y = 1}
 end
 
-local res = union
+local res = union()
 
-if type(res) == "table" then
-  return res
-end
 
-return 1
+
+return res.z

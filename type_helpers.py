@@ -61,6 +61,7 @@ def intersect(type1: MonoType, type2: MonoType) -> 'Optional[MonoType]':
   if isinstance(type2, TypeVariable):
     return type1
   if isinstance(type2, UnionType):
+    print(type1, type2, unify(type1, type2.left))
     if not isinstance(unify(type1, type2.left), str):
       return intersect(type1, type2.left)
     return intersect(type1, type2.right)
@@ -78,7 +79,9 @@ def intersect(type1: MonoType, type2: MonoType) -> 'Optional[MonoType]':
       return None
     args = []
     for a, b in zip(type1.args, type2.args):
-      args.append(intersect(a, b))
+      val = intersect(a, b)
+      assert val is not None
+      args.append(val)
     return TypeConstructor(type1.name, args, type1.value)
   return None
 
@@ -135,6 +138,7 @@ def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
     right_s = unify(type1, type2.right)
     if isinstance(right_s, Substitution):
       s = right_s.apply_subst(s)
+    if isinstance(left_s, str) and isinstance(right_s, str): return left_s
     return s
   if isinstance(type1, UnionType):
     left_s = unify(type1.left, type2)
@@ -194,9 +198,49 @@ def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
 def broaden(type: MonoType) -> MonoType:
   if isinstance(type, TypeConstructor):
     return TypeConstructor(type.name, [broaden(a) for a in type.args], None)
+  if isinstance(type, UnionType):
+    return UnionType(broaden(type.left), broaden(type.right))
   return type
 
 def flatten_tuple(type: MonoType) -> MonoType:
   if isinstance(type, TypeConstructor) and type.name == "tuple":
     return flatten_tuple(type.args[0])
   return type
+
+def smart_union(type1: MonoType, type2: MonoType) -> MonoType:
+  if isinstance(type1, TypeVariable) and isinstance(type2, TypeVariable) and type1.name == type2.name:
+    return type1
+  if isinstance(type1, TypeConstructor) and isinstance(type2, TypeConstructor):
+    if type1.name == type2.name:
+      return TypeConstructor(type1.name, [smart_union(a, b) for a, b in zip(type1.args, type2.args)], type1.value)
+    return UnionType(type1, type2)
+  if isinstance(type1, TableType) and isinstance(type2, TableType):
+    fields: list[tuple[MonoType, MonoType]] = []
+    for k1, v1 in type1.fields:
+      val = None
+      for k2, v2 in type2.fields:
+        if not isinstance(unify(k1, k2), str):
+          val = v2
+      for fk, fv in fields:
+        if not isinstance(unify(k1, fk), str):
+          break
+      else:
+        if not val:
+          fields.append((k1, smart_union(v1, NilType)))
+        else:
+          fields.append((k1, smart_union(v1, val)))
+    for k1, v1 in type2.fields:
+      val = None
+      for k2, v2 in type1.fields:
+        if not isinstance(unify(k1, k2), str):
+          val = v2
+      for fk, fv in fields:
+        if not isinstance(unify(k1, fk), str):
+          break
+      else:
+        if not val:
+          fields.append((k1, smart_union(v1, NilType)))
+        else:
+          fields.append((k1, smart_union(v1, val)))
+    return TableType(fields)
+  return UnionType(type1, type2)

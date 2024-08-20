@@ -76,7 +76,7 @@ def infer_type_check_predicate(node: IfStmt, ctx: Context) -> Optional[UnifyErro
             res = infer(arg, ctx)
             if isinstance(res, UnifyError): return res
             _, arg_t = res
-            type = None
+            type: MonoType | None = None
             if contents == "number":
               type = NumberType
             elif contents == "string":
@@ -91,9 +91,23 @@ def infer_type_check_predicate(node: IfStmt, ctx: Context) -> Optional[UnifyErro
               type = TypeConstructor("function", [new_type_var(), new_type_var(), new_type_var()], None)
             else:
               assert False, f"Not implemented: {contents}"
-            res = intersect(arg_t, type)
-            if res is None: return UnifyError(node.location, f"Attempting to narrow down type '{arg_t}' to '{type}' will result in a 'never' type")
-            ctx.mapping[arg.name] = res
+            res1 = intersect(arg_t, type)
+            if res1 is None: return UnifyError(node.location, f"Attempting to narrow down type '{arg_t}' to '{type}' will result in a 'never' type")
+            ctx.mapping[arg.name] = res1
+            return None
+      if isinstance(left, Var):
+        res = infer(right, ctx)
+        if isinstance(res, UnifyError): return res
+        expr_s, expr_t = res
+        expr_t = broaden(expr_t)
+        res = infer(left, ctx)
+        if isinstance(res, UnifyError): return res
+        var_s, var_t = res
+        var_t = broaden(var_t)
+        res2 = intersect(var_t, expr_t)
+        if res2 is None: return UnifyError(node.location, f"Attempting to compare two distinct types: '{var_t}' and '{expr_t}'")
+        ctx.mapping[left.name] = res2
+        return None
   return None
 
 def infer(node: BaseNode, ctx: Context) -> UnifyResult:
@@ -390,11 +404,12 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
           # return UnifyError(node.location, ret_s)
         s = ret_s.apply_subst(s)
         assert isinstance(ret, TypeConstructor)
-        for i, arg in enumerate(stmt_t.args):
+        assert isinstance(stmt_t, TypeConstructor)
+        for i, arg1 in enumerate(stmt_t.args):
           if i >= len(ret.args):
-            ret.args.append(UnionType(arg, NilType))
+            ret.args.append(UnionType(arg1, NilType))
           else:
-            ret.args[i] = UnionType(ret.args[i], arg)
+            ret.args[i] = smart_union(ret.args[i], arg1)
         ret = ret_s.apply_mono(broaden(ret))
       s = stmt_s.apply_subst(s)
     if node.last:
@@ -411,11 +426,11 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
         ret = ret_s.apply_mono(broaden(ret))
         assert isinstance(stmt_t, TypeConstructor) and stmt_t.name == "tuple"
         assert isinstance(ret, TypeConstructor)
-        for i, arg in enumerate(stmt_t.args):
+        for i, arg1 in enumerate(stmt_t.args):
           if i >= len(ret.args):
-            ret.args.append(UnionType(arg, NilType))
+            ret.args.append(UnionType(arg1, NilType))
           else:
-            ret.args[i] = UnionType(ret.args[i], arg)
+            ret.args[i] = smart_union(ret.args[i], arg1)
         s = ret_s.apply_subst(s)
       s = stmt_s.apply_subst(s)
     elif ret:

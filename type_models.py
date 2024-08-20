@@ -55,18 +55,18 @@ NilType = TypeConstructor("nil", [], None)
 def array_repr(table: 'TableType') -> str | Literal[False]:
   from type_helpers import unify, broaden
   types = list(map(lambda f: f[1], table.fields))
-  filtered = []
+  filtered: list[MonoType] = []
   for type in types:
     for filt in filtered:
       if not isinstance(unify(type, filt), str):
         break
     else:
       filtered.append(broaden(type))
-  filtered = [repr(f) for f in filtered]
-  if len(filtered) > 1:
+  strs = [repr(f) for f in filtered]
+  if len(strs) > 1:
     return False
-  if len(filtered) == 1:
-    return f"{filtered[0]}[]"
+  if len(strs) == 1:
+    return f"{strs[0]}[]"
   return f"[]"
 
 def is_array(table: 'TableType') -> bool:
@@ -113,16 +113,24 @@ class UnionType:
       right = self.right.collect()
     return left + right
   def __repr__(self) -> str:
+    if isinstance(self.left, TypeConstructor) and self.left.name == "nil":
+      right = f"{self.right}"
+      return f"({right})?" if " " in right else f"{right}?"
+    if isinstance(self.right, TypeConstructor) and self.right.name == "nil":
+      left = f"{self.left}"
+      return f"({left})?" if " " in left else f"{left}?"
+    
+    #return f"({self.left}) | ({self.right})"
     from type_helpers import unify
     types = self.collect()
-    filtered = []
+    filtered: list[MonoType] = []
     for type in types:
       for filt in filtered:
         if not isinstance((s := unify(type, filt)), str):
           break
       else:
         filtered.append(type)
-    return " | ".join(f"({f})" if " " in f"{f}" else f"{f}" for f in filtered)
+    return " | ".join(f"({f})" if ((s := f"{f}") and " " in s and not s.startswith("{")) else f"{f}" for f in filtered)
 
 @dataclass
 class ForallType:
