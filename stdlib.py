@@ -12,8 +12,10 @@ var = TypeVariable
 
 tostring_a = new_type_var()
 type_a = new_type_var()
+print_a = new_type_var()
 
 ctx: Context = Context({
   "tostring": ForallType(tostring_a.name, fn(tup(tostring_a), tup(StringType), NilType)),
-  "type": ForallType(type_a.name, fn(tup(type_a), tup(StringType), NilType))
+  "type": ForallType(type_a.name, fn(tup(type_a), tup(StringType), NilType)),
+  "print": ForallType(print_a.name, TypeConstructor("function", [tup(), tup(StringType), print_a], True, [])),
 })

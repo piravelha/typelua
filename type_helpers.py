@@ -38,8 +38,9 @@ class Substitution:
     for n, t in s.mapping.items():
       if new.get(n):
         res = intersect(t, new[n])
-        if not res:
-          res = t
+        #if not res:
+        #  res = t
+        assert res
         new[n] = res
       else:
         new[n] = self.apply_mono(t)
@@ -67,7 +68,14 @@ def intersect(type1: MonoType, type2: MonoType) -> 'Optional[MonoType]':
     return intersect(type2, type1)
   if isinstance(type1, TableType) and isinstance(type2, TableType):
     fields = type1.fields + type2.fields
-    return TableType(fields)
+    filtered = []
+    for k, v in fields:
+      for fk, fv in filtered:
+        if not isinstance(unify(k, fk), str):
+          break
+      else:
+        filtered.append((k, v))
+    return TableType(filtered)
   if isinstance(type1, TypeVariable) and isinstance(type2, TypeVariable):
     if type1.name != type2.name:
       return None
@@ -155,14 +163,14 @@ def unify(type1: MonoType, type2: MonoType) -> Result[Substitution]:
     return s
   if isinstance(type1, TableType) and isinstance(type2, TableType):
     s = Substitution({})
-    for (k1, v1) in type1.fields:
+    for (k2, v2) in type2.fields:
       v: 'MonoType | None' = None
-      for k2, v2 in type2.fields:
-        if not isinstance(unify(k1, k2), str):
-          v = v2
+      for k1, v1 in type1.fields:
+        if not isinstance(unify(k2, k1), str):
+          v = v1
           break
-      if v is None: return f"Field '{k1}' expected on type '{type2}', but was not found"
-      v_res = unify(v, v1)
+      if v is None: return f"Field '{k2}' expected on type '{type1}', but was not found"
+      v_res = unify(v, v2)
       if isinstance(v_res, str): return v_res
       s = v_res.apply_subst(s)
     return s

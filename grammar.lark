@@ -36,6 +36,8 @@ assignables: assignable ("," assignable)*
 ?assignable: NAME
            | prop_expr
            | index_expr
+
+var_type_annotation: "--" "@type" tuple_type
 var_decl: "local" names "=" exprs
 
 exprs: expr ("," expr)*

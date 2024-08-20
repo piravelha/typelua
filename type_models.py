@@ -45,8 +45,7 @@ class TypeConstructor:
     if self.name == "boolean" and self.value is not None:
       return self.value and "true" or "false"
     if self.name == "function":
-      vararg: list[str] = ["..."] if self.value else []
-      params = ", ".join([str(a) for a in cast(TypeConstructor, self.args[0]).args] + vararg)
+      params = ", ".join([str(a) for a in cast(TypeConstructor, self.args[0]).args] + (["..." + str(self.args[2])] if self.value else []))
       rets = ", ".join(f"{r}" for r in self.args[1].args) if isinstance(self.args[1], TypeConstructor) and self.args[1].name == "tuple" else repr(self.args[1])
       return f"({params}) -> {rets}"
     if self.name == "tuple":
@@ -137,6 +136,12 @@ class UnionType:
     filtered: list[MonoType] = []
     for type in types:
       for filt in filtered:
+        if isinstance(filt, TypeVariable) and isinstance(type, TypeVariable) and filt.name == type.name:
+          break
+        if isinstance(filt, TypeVariable):
+          continue
+        if isinstance(type, TypeVariable):
+          continue
         if not isinstance((s := unify(type, filt)), str):
           break
       else:

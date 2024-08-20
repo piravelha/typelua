@@ -452,23 +452,32 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
       if isinstance(res, UnifyError): return res
       stmt_s, stmt_t = res
       if isinstance(stmt_t, TypeConstructor) and stmt_t.name == "tuple" and not isinstance(stmt, FuncCall):
-        if stmt_s.is_returning: has_returned = True
-        if ret is None:
-          ret = stmt_t
-        #else:
-        ret_s = unify(stmt_t, broaden(ret))
-        if isinstance(ret_s, str):
-          ret_s = Substitution({})
-          # return UnifyError(node.location, ret_s)
-        s = ret_s.apply_subst(s)
-        assert isinstance(ret, TypeConstructor)
-        assert isinstance(stmt_t, TypeConstructor)
-        for i, arg1 in enumerate(stmt_t.args):
-          if i >= len(ret.args):
-            ret.args.append(UnionType(arg1, NilType))
-          else:
-            ret.args[i] = smart_union(ret.args[i], arg1)
-        ret = ret_s.apply_mono(ret)
+        if not stmt_s.is_returning:
+          if ret is None:
+            ret = stmt_t
+          #else:
+          ret_s = unify(stmt_t, broaden(ret))
+          if isinstance(ret_s, str):
+            return UnifyError(node.location, ret_s)
+          # s = ret_s.apply_subst(s)
+        if stmt_s.is_returning:
+          has_returned = True
+          if ret is None:
+            ret = stmt_t
+          #else:
+          ret_s = unify(stmt_t, broaden(ret))
+          if isinstance(ret_s, str):
+            ret_s = Substitution({})
+            # return UnifyError(node.location, ret_s)
+          # s = ret_s.apply_subst(s)
+          assert isinstance(ret, TypeConstructor)
+          assert isinstance(stmt_t, TypeConstructor)
+          for i, arg1 in enumerate(stmt_t.args):
+            if i >= len(ret.args):
+              ret.args.append(UnionType(arg1, NilType))
+            else:
+              ret.args[i] = smart_union(ret.args[i], arg1)
+          ret = ret_s.apply_mono(ret)
       s = stmt_s.apply_subst(s)
     if node.last:
       res = infer(node.last, ctx)
@@ -489,7 +498,7 @@ def infer(node: BaseNode, ctx: Context) -> UnifyResult:
             ret.args.append(UnionType(arg1, NilType))
           else:
             ret.args[i] = smart_union(ret.args[i], arg1)
-        s = ret_s.apply_subst(s)
+        # s = ret_s.apply_subst(s)
       s = stmt_s.apply_subst(s)
     elif ret and not has_returned:
       new_ret = TypeConstructor("tuple", [], None, [])
